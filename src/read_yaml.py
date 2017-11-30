@@ -22,12 +22,9 @@ class ReadYAML:
             if self.test_dict is None:
                 self.test_dict = {}
             f.close()
-        except IOError as e:
+        except (IOError, yaml.YAMLError) as e:
         	rospy.logerr(e)
-        	return -1
-        except yaml.YAMLError as e:
-            rospy.logerr(e)
-            return -1
+        	return 0
 
     def manage_data(self):
         for key, value in self.test_dict.items():

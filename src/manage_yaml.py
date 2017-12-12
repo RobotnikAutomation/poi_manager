@@ -1,4 +1,4 @@
-https://github.com/RobotnikAutomation/poi_manager.git#!/usr/bin/env python
+#!/usr/bin/env python
 
 import rospy
 import yaml

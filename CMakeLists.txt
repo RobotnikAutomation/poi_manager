@@ -56,8 +56,8 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate services in the 'srv' folder
   add_service_files(
     FILES
-    ReadYaml.srv
-    UpdateYaml.srv
+    ReadPOIs.srv
+    UpdatePOIs.srv
   )
 
 ## Generate actions in the 'action' folder

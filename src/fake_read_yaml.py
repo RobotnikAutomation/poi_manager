@@ -19,7 +19,7 @@ def handle_labeled_pose_list(req):
 
 def main():
     rospy.init_node('read_yaml')
-    service = rospy.Service('labeled_pose_list', ReadYaml, handle_labeled_pose_list)
+    service = rospy.Service('labeled_pose_list', ReadPOIs, handle_labeled_pose_list)
     print "Publishing pose list"
     rospy.spin()
 

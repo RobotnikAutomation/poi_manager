@@ -10,10 +10,8 @@ from geometry_msgs.msg import Pose2D
 class ManageYAML:
 
     def __init__(self):
-        args = rospy.myargv(argv=sys.argv)
         rospack = rospkg.RosPack()
-        self.yaml_path = args[1]
-        #self.yaml_path = rospack.get_path('ros_pose_reader') + '/test2.yaml'
+        self.yaml_path = rospack.get_path('ros_pose_reader') + '/test2.yaml'
         self.pose_list = []
         self.pose_dict = {}
 

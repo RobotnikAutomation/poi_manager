@@ -42,7 +42,7 @@ def handle_labeled_pose_list(req):
     yaml_manager = ManageYAML()
     yaml_manager.parse_yaml()
     yaml_manager.manage_read_data()
-    return LabeledPoseListResponse(yaml_reader.pose_list)
+    return ReadPOIsResponse(yaml_manager.pose_list)
 
 def handle_updated_list(req):
     yaml_manager = ManageYAML()

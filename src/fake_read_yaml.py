@@ -15,7 +15,7 @@ def handle_labeled_pose_list(req):
     pose_list.append(pose)
     pose_list.append(pose2)
     pose_list.append(pose3)
-    return ReadYamlResponse(pose_list)
+    return ReadPOIsResponse(pose_list)
 
 def main():
     rospy.init_node('read_yaml')

@@ -2,8 +2,8 @@
 
 import rospy
 import yaml
-from ros_pose_reader.msg import *
-from ros_pose_reader.srv import *
+from poi_manager.msg import *
+from poi_manager.srv import *
 from geometry_msgs.msg import Pose2D
 
 pose_list = []
@@ -15,11 +15,11 @@ def handle_labeled_pose_list(req):
     pose_list.append(pose)
     pose_list.append(pose2)
     pose_list.append(pose3)
-    return LabeledPoseListResponse(pose_list)
+    return ReadYamlResponse(pose_list)
 
 def main():
     rospy.init_node('read_yaml')
-    service = rospy.Service('labeled_pose_list', LabeledPoseList, handle_labeled_pose_list)
+    service = rospy.Service('labeled_pose_list', ReadYaml, handle_labeled_pose_list)
     print "Publishing pose list"
     rospy.spin()
 

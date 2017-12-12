@@ -1,17 +1,17 @@
-#!/usr/bin/env python
+https://github.com/RobotnikAutomation/poi_manager.git#!/usr/bin/env python
 
 import rospy
 import yaml
 import rospkg
-from ros_pose_reader.msg import *
-from ros_pose_reader.srv import *
+from poi_manager.msg import *
+from poi_manager.srv import *
 from geometry_msgs.msg import Pose2D
 
 class ManageYAML:
 
     def __init__(self):
         rospack = rospkg.RosPack()
-        self.yaml_path = rospack.get_path('ros_pose_reader') + '/test2.yaml'
+        self.yaml_path = rospack.get_path('poi_manager') + '/test2.yaml'
         self.pose_list = []
         self.pose_dict = {}
 

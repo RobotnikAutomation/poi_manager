@@ -53,7 +53,7 @@ def main():
     rospy.init_node('manage_yaml')
     service_read_yaml = rospy.Service('manage_yaml/read_data', ReadYaml, handle_labeled_pose_list)
     service_write_data = rospy.Service('manage_yaml/update_data', UpdateYaml, handle_updated_list)
-    print "(TODO: Change) Publishing pose list"
+    print "Node running. Use 'manage_yaml/read_data' service to get data from YAML file and 'manage_yaml/update_data' to update it"
     rospy.spin()
 
 

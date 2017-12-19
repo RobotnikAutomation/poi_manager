@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <launch>
-	<arg name="id_robot" default="rbsherpa_hl_a"/>
+	<arg name="id_robot" default="summit_xl_a"/>
 
 	<group ns="$(arg id_robot)">
 		<node pkg="poi_manager" name="poi_manager" type="manage_yaml.py" output="screen">

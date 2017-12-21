@@ -43,11 +43,13 @@ def handle_labeled_pose_list(req):
     yaml_manager = ManageYAML()
     yaml_manager.parse_yaml()
     yaml_manager.manage_read_data()
+    print "read_pois service done"
     return ReadPOIsResponse(yaml_manager.pose_list)
 
 def handle_updated_list(req):
     yaml_manager = ManageYAML()
     yaml_manager.update_yaml(req)
+    print "update_pois service done"
     return UpdatePOIsResponse()
 
 

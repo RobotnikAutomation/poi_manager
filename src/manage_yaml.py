@@ -12,7 +12,8 @@ class ManageYAML:
 
     def __init__(self):
         rospack = rospkg.RosPack()
-        self.yaml_path = rospack.get_path('poi_manager') + '/test.yaml'
+        self.filename = rospy.get_param('~filename', 'test')
+        self.yaml_path = rospack.get_path('poi_manager') +'/'+ self.filename+'.yaml'
         self.pose_list = []
         self.pose_dict = {}
 
@@ -55,8 +56,8 @@ def handle_updated_list(req):
 
 def main():
     rospy.init_node('manage_yaml')
-    service_read_yaml = rospy.Service('read_pois', ReadPOIs, handle_labeled_pose_list)
-    service_write_data = rospy.Service('update_pois', UpdatePOIs, handle_updated_list)
+    service_read_yaml = rospy.Service('~read_pois', ReadPOIs, handle_labeled_pose_list)
+    service_write_data = rospy.Service('~update_pois', UpdatePOIs, handle_updated_list)
     print "Node running."
     rospy.spin()
 

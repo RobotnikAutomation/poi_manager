@@ -1,9 +1,11 @@
 <?xml version="1.0"?>
 <launch>
 	<arg name="id_robot" default="summit_xl_a"/>
+	<arg name="node_name" default="poi_manager"/>
 
 	<group ns="$(arg id_robot)">
-		<node pkg="poi_manager" name="poi_manager" type="manage_yaml.py">
+		<node pkg="poi_manager" name="$(arg node_name)" type="manage_yaml.py">
+		  <param name="filename" value="$(arg node_name)"/>
 		</node>
 	</group>
 

@@ -2,10 +2,18 @@
 <launch>
 	<arg name="id_robot" default="summit_xl_a"/>
 	<arg name="node_name" default="poi_manager"/>
+	<arg name="publish_markers" default="True"/>
+	<arg name="marker_topic" default="markers"/>
+	<arg name="frequency" default="0.5"/>
+	<arg name="frame_id" default="summit_xl_a_map"/>
 
 	<group ns="$(arg id_robot)">
 		<node pkg="poi_manager" name="$(arg node_name)" type="manage_yaml.py">
 		  <param name="filename" value="$(arg node_name)"/>
+		  <param name="publish_markers" value="$(arg publish_markers)"/>
+		  <param name="marker_topic" value="$(arg marker_topic)" if="$(arg publish_markers)"/>
+		  <param name="frequency" value="$(arg frequency)" if="$(arg publish_markers)"/>
+		  <param name="frame_id" value="$(arg frame_id)" if="$(arg publish_markers)"/>	
 		</node>
 	</group>
 

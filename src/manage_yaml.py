@@ -4,6 +4,7 @@ import rospy
 import yaml
 import rospkg
 import tf
+import os
 from poi_manager.msg import *
 from poi_manager.srv import *
 from geometry_msgs.msg import Pose2D
@@ -15,7 +16,9 @@ class ManageYAML:
     def __init__(self):
         rospack = rospkg.RosPack()
         self.filename = rospy.get_param('~filename', 'test')
-        self.yaml_path = rospack.get_path('poi_manager') +'/'+ self.filename+'.yaml'
+        self.folder = rospy.get_param('~folder', os.path.join(rospack.get_path('poi_manager'), 'config'))
+	self.yaml_path =  self.folder +'/'+ self.filename+'.yaml'
+	
         self.pose_list = []
         self.pose_dict = {}
         self.service_read_yaml = rospy.Service('~read_pois', ReadPOIs, self.handle_labeled_pose_list)
@@ -29,6 +32,7 @@ class ManageYAML:
             self.frame_id = rospy.get_param('~frame_id', 'map')
             self.marker_array_publisher = rospy.Publisher(self.filename+'/'+self.marker_topic, MarkerArray, queue_size=10)
 
+	rospy.loginfo('%s::_init_: config file path: %s',rospy.get_name(), self.yaml_path)
 
     def start(self):
         while not rospy.is_shutdown() and self.publish_markers:
@@ -115,12 +119,12 @@ class ManageYAML:
     def handle_labeled_pose_list(self, req):
         self.parse_yaml()
         self.manage_read_data()
-        print "read_pois service done"
+        rospy.loginfo("%s::handle_labeled_pose_list: read_pois service done", rospy.get_name())
         return ReadPOIsResponse(self.pose_list)
 
     def handle_updated_list(self, req):
         self.update_yaml(req)
-        print "update_pois service done"
+        rospy.loginfo("%s::handle_updated_list: update_pois service done", rospy.get_name())
         return UpdatePOIsResponse()
     
 
@@ -128,7 +132,7 @@ def main():
     rospy.init_node('manage_yaml')
     yaml_manager = ManageYAML()
     yaml_manager.start()
-    print "Node running."
+    rospy.loginfo("%s::main: spin", rospy.get_name())
     rospy.spin()
 
 

@@ -8,6 +8,7 @@ import os
 from poi_manager.msg import *
 from poi_manager.srv import *
 from geometry_msgs.msg import Pose2D
+from robotnik_msgs.msg import ptz
 from std_msgs.msg import Empty
 from visualization_msgs.msg import MarkerArray, Marker
 
@@ -54,7 +55,7 @@ class ManageYAML:
     def manage_read_data(self):
         self.pose_list = []
         for key, value in self.pose_dict.items():
-            self.pose_list.append(LabeledPose(key, Pose2D(value[0], value[1], value[2])))
+            self.pose_list.append(LabeledPose(key, Pose2D(value['pose'][0], value['pose'][1], value['pose'][2]), ptz(value['ptz_pose'][0], value['ptz_pose'][1], value['ptz_pose'][2], False)))
 
         if self.publish_markers:
             self.update_marker_array()
@@ -65,7 +66,9 @@ class ManageYAML:
         pose_list = req.pose_list
         self.pose_dict = {}
         for elem in pose_list:
-            self.pose_dict[elem.label] = [elem.pose.x, elem.pose.y, elem.pose.theta]
+            self.pose_dict[elem.label] = {}
+            self.pose_dict[elem.label]['pose'] = [elem.pose.x, elem.pose.y, elem.pose.theta]
+            self.pose_dict[elem.label]['ptz_pose'] = [elem.ptz_pose.pan, elem.ptz_pose.tilt, elem.ptz_pose.zoom]
         yaml.dump(self.pose_dict, yaml_file)
 
         if self.publish_markers:

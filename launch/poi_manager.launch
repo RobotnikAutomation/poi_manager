@@ -7,9 +7,9 @@
 	<arg name="frequency" default="0.5"/>
 	<arg name="frame_id" default="robot_map"/>
 	<arg name="folder" default="$(find poi_manager)/config"/>
-	<arg name="filename" default="points"/>
+	<arg name="filename" default="test"/>
 
-	<node pkg="poi_manager" name="$(arg node_name)" type="manage_yaml.py">
+	<node pkg="poi_manager" name="$(arg node_name)" type="manage_yaml.py" output="screen">
 		<param name="folder" value="$(arg folder)"/>
 		<param name="filename" value="$(arg filename)"/>
 		<param name="publish_markers" value="$(arg publish_markers)"/>

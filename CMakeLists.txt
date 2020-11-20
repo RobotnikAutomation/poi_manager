@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   visualization_msgs
   tf
+  robotnik_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -58,7 +59,6 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate services in the 'srv' folder
   add_service_files(
     FILES
-    GetPOI.srv
     ReadPOIs.srv
     UpdatePOIs.srv
   )

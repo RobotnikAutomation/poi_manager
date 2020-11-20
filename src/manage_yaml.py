@@ -10,6 +10,7 @@ from poi_manager.srv import *
 from geometry_msgs.msg import Pose2D
 from std_msgs.msg import Empty
 from visualization_msgs.msg import MarkerArray, Marker
+from robotnik_msgs.srv import GetPOI, GetPOIResponse
 
 class ManageYAML:
 

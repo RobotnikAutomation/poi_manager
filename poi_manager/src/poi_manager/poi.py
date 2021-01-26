@@ -10,8 +10,8 @@ import yaml
 import rospkg
 import tf
 import os
-from poi_manager.msg import *
-from poi_manager.srv import *
+from poi_manager_msgs.msg import *
+from poi_manager_msgs.srv import *
 from geometry_msgs.msg import Pose2D
 from std_msgs.msg import Empty
 from visualization_msgs.msg import MarkerArray, Marker
@@ -29,6 +29,7 @@ class PoiManager(RComponent):
 
     def ros_read_params(self):
         """Gets params from param server"""
+        RComponent.ros_read_params(self)
 
         rospack = rospkg.RosPack()
         self.filename = rospy.get_param('~filename', 'test')

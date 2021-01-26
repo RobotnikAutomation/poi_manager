@@ -12,35 +12,37 @@ from std_msgs.msg import Empty
 from visualization_msgs.msg import MarkerArray, Marker
 from robotnik_msgs.srv import GetPOI, GetPOIResponse
 
-class ManageYAML:
+
+class PoiManager:
 
     def __init__(self):
         rospack = rospkg.RosPack()
         self.filename = rospy.get_param('~filename', 'test')
         self.folder = rospy.get_param('~folder', os.path.join(rospack.get_path('poi_manager'), 'config'))
-	self.yaml_path =  self.folder +'/'+ self.filename+'.yaml'
-	
+        self.yaml_path = self.folder + '/' + self.filename+'.yaml'
+
         self.pose_list = []
         self.pose_dict = {}
         self.service_read_yaml = rospy.Service('~read_pois', ReadPOIs, self.handle_labeled_pose_list)
         self.service_write_data = rospy.Service('~update_pois', UpdatePOIs, self.handle_updated_list)
         self.service_get_poi = rospy.Service('~get_poi', GetPOI, self.get_poi_cb)
-        
-        self.publish_markers = rospy.get_param('~publish_markers',False)
+
+        self.publish_markers = rospy.get_param('~publish_markers', False)
         if self.publish_markers:
             self.marker_array = MarkerArray()
             self.marker_topic = rospy.get_param('~marker_topic', 'markers')
             self.frequency = rospy.get_param('~frequency', 0.5)
             self.frame_id = rospy.get_param('~frame_id', 'map')
-            self.marker_array_publisher = rospy.Publisher(self.filename+'/'+self.marker_topic, MarkerArray, queue_size=10)
+            self.marker_array_publisher = rospy.Publisher(
+                self.filename+'/'+self.marker_topic, MarkerArray, queue_size=10)
 
-	rospy.loginfo('%s::_init_: config file path: %s',rospy.get_name(), self.yaml_path)
+        rospy.loginfo('%s::_init_: config file path: %s', rospy.get_name(), self.yaml_path)
 
     def start(self):
         while not rospy.is_shutdown() and self.publish_markers:
             self.marker_array_publisher.publish(self.marker_array)
             rospy.sleep(1/self.frequency)
-            
+
     def parse_yaml(self):
         try:
             f = open(self.yaml_path, 'r')
@@ -50,8 +52,8 @@ class ManageYAML:
                 self.pose_dict = {}
             f.close()
         except (IOError, yaml.YAMLError) as e:
-        	rospy.logerr(e)
-        	return 0
+            rospy.logerr(e)
+            return 0
 
     def manage_read_data(self):
         self.pose_list = []
@@ -60,7 +62,6 @@ class ManageYAML:
 
         if self.publish_markers:
             self.update_marker_array()
-
 
     def update_yaml(self, req):
         yaml_file = file(self.yaml_path, 'w')
@@ -103,7 +104,7 @@ class ManageYAML:
         marker.scale.y = 0.1
         marker.scale.z = 0.1
         # TODO parameterize arrow color
-        marker.color.a = 1.0 
+        marker.color.a = 1.0
         marker.color.g = 1.0
         marker.lifetime = rospy.Duration(1/self.frequency)
         if marker_type == 'arrow':
@@ -115,7 +116,7 @@ class ManageYAML:
             marker.text = data[0]
             marker.pose.position.z = 0.5
             marker.color.r = 1.0
-            marker.color.b = 1.0 
+            marker.color.b = 1.0
         return marker
 
     def handle_labeled_pose_list(self, req):
@@ -128,7 +129,7 @@ class ManageYAML:
         self.update_yaml(req)
         rospy.loginfo("%s::handle_updated_list: update_pois service done", rospy.get_name())
         return UpdatePOIsResponse()
-    
+
     def get_poi_cb(self, req):
         name = req.name
         response = GetPOIResponse()
@@ -140,17 +141,17 @@ class ManageYAML:
                     return response
         else:
             response.success = False
-        
+
         return response
 
 
 def main():
-    rospy.init_node('manage_yaml')
-    yaml_manager = ManageYAML()
+    rospy.init_node('poi_manager')
+    yaml_manager = PoiManager()
     yaml_manager.start()
     rospy.loginfo("%s::main: spin", rospy.get_name())
     rospy.spin()
 
 
 if __name__ == "__main__":
-	main()
+    main()

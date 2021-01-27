@@ -1,3 +1,35 @@
-storage_A: [1.7, 2.3, 0.1]
-storage_B: [3.89, 2.3, -0.2]
-packaging_A: [2.17, 0.2333, -1.57]
+environements:
+  almacen:    
+    points: 
+      P1:
+        position: [1.7,1.8,0.0]
+        orientation: [0.0, 0.0, 0.6903032564511474, 1.72352015461419]
+        frame_id: "map"
+        params: " "
+      P2:
+        position: [1.7,1.5,1.0]
+        orientation: [0.0, 0.0, 0.6903032564511474, 2.72352015461419]
+        frame_id: "map"
+        params: "1 "
+      P3:   
+        position: [1.7,2.5,2.0]
+        orientation: [0.0, 0.0, 0.6903032564511474, 3.72352015461419]
+        frame_id: "map"
+        params: "2 "
+  planta1:  
+    points: 
+      P1:
+        position: [2.7,1.5,0.0]
+        orientation: [0.0, 0.0, 0.6903032564511474, 0.72352015461419]
+        frame_id: "map"
+        params: " test"
+      P2:
+        position: [3.7,1.5,0.0]
+        orientation: [0.0, 0.0, 0.6903032564511474, 0.72352015461419]
+        frame_id: "map"
+        params: "3 "
+      P3:   
+        position: [4.7,1.5,5.0]
+        orientation: [0.0, 0.0, 0.6903032564511474, 0.72352015461419]
+        frame_id: "map"
+        params: "4 "

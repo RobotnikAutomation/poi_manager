@@ -1,5 +1,6 @@
-poi_manager_msgs/LabeledPose[] pose_list
+string name
 string environement
 ---
 bool success
 string message
+poi_manager_msgs/LabeledPose p

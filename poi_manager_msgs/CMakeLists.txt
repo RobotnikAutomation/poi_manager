@@ -12,8 +12,13 @@ add_message_files(
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
+  AddPOI.srv
+  AddPOI_params.srv
+  GetPOI.srv
+  GetPOIs.srv
   ReadPOIs.srv
   UpdatePOIs.srv
+
 )
 
 generate_messages(

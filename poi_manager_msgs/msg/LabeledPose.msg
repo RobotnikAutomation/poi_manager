@@ -1,2 +1,5 @@
-string label
-geometry_msgs/Pose2D pose
+string name
+string environement
+string params
+string frame_id
+geometry_msgs/Pose pose

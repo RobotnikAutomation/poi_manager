@@ -125,8 +125,13 @@ class PoiManager(RComponent):
         
         if self.publish_markers:
             self.update_marker_array()
-
+            
         return True,msg
+
+    def init_state(self):
+        req = ReadPOIsRequest()
+        self.handle_labeled_pose_list(req)         
+        self.switch_to_state(State.READY_STATE)
 
     #def ready_state(self):
         

@@ -1,5 +1,5 @@
 string name
-string environement
+string environment
 string frame_id
 string params
 float32 x

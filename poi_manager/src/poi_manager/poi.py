@@ -24,7 +24,7 @@ class PoiManager(RComponent):
     def __init__(self):
 
         self.pose_list = []
-        self.pose_dict = {'environements':{}}
+        self.pose_dict = {'environments':{}}
 
         RComponent.__init__(self)
 
@@ -51,9 +51,11 @@ class PoiManager(RComponent):
         self.service_read_yaml = rospy.Service('~read_pois', ReadPOIs, self.handle_labeled_pose_list)
         self.service_write_data = rospy.Service('~update_pois', UpdatePOIs, self.handle_updated_list)
         self.service_get_poi = rospy.Service('~get_poi', GetPOI, self.get_poi_cb)
+        self.service_delete_poi = rospy.Service('~delete_poi', DeletePOI, self.delete_poi_cb)
+        self.service_delete_envir = rospy.Service('~delete_environment', DeleteEnvironment, self.delete_environment_cb)
         self.service_get_poi_list = rospy.Service('~get_poi_list', GetPOIs, self.get_poi_list_cb)
         self.service_add_poi = rospy.Service('~add_poi', AddPOI, self.add_poi_cb)
-        self.service_add_poi = rospy.Service('~add_poi_by_params', AddPOI_params, self.add_poi_by_params_cb)
+        self.service_add_poi_by_params = rospy.Service('~add_poi_by_params', AddPOI_params, self.add_poi_by_params_cb)
         if self.publish_markers:
             self.marker_array = MarkerArray()
 
@@ -97,7 +99,7 @@ class PoiManager(RComponent):
                                 points_n = points_n + 1
                                 labeled_point = LabeledPose()
                                 labeled_point.name = name_point_key
-                                labeled_point.environement = key_list
+                                labeled_point.environment = key_list
                                 for point_params_key,value_params in values_point.items():                                                              
                                     if (point_params_key=='frame_id'):
                                         labeled_point.frame_id = value_params
@@ -122,7 +124,7 @@ class PoiManager(RComponent):
             msg = "%s::Error reading yaml file: %s" % (rospy.get_name(),identifier)
             rospy.logerror(msg)  
             return False,msg  
-        msg = " Read %d environements and %d points" % (envir_n,points_n)
+        msg = " Read %d environments and %d points" % (envir_n,points_n)
         
         if self.publish_markers:
             self.update_marker_array()
@@ -137,9 +139,9 @@ class PoiManager(RComponent):
     def update_yaml(self, req):
         yaml_file = file(self.yaml_path, 'w')
         pose_list = req.pose_list
-        self.pose_dict = {}
-        for elem in pose_list:
-            self.pose_dict[elem.label] = [elem.pose.x, elem.pose.y, elem.pose.theta]
+        #self.pose_dict = {}
+        #for elem in pose_list:
+        #    self.pose_dict[elem.label] = [elem.pose.x, elem.pose.y, elem.pose.theta]
         yaml.dump(self.pose_dict, yaml_file)
         
         if self.publish_markers:
@@ -168,7 +170,7 @@ class PoiManager(RComponent):
         marker = Marker()
         marker.header.frame_id = point.frame_id
         marker.header.stamp = rospy.Time()
-        marker.ns = point.name + "_" + point.environement
+        marker.ns = point.name + "_" + point.environment
         marker.action = Marker.ADD
         marker.pose.position.x = point.pose.position.x
         marker.pose.position.y = point.pose.position.y
@@ -192,7 +194,7 @@ class PoiManager(RComponent):
             marker.scale.z = 0.5
             marker.id = 1
             marker.type = Marker.TEXT_VIEW_FACING
-            marker.text = point.name + "_" + point.environement
+            marker.text = point.name + "_" + point.environment
             marker.pose.position.z = 0.5
             marker.color.r = 1.0
             marker.color.b = 1.0
@@ -215,17 +217,17 @@ class PoiManager(RComponent):
         response = GetPOIResponse()
         if len(self.pose_list) > 0:            
             for poi in self.pose_list:                
-                if poi.name == req.name and poi.environement == req.environement:
+                if poi.name == req.name and poi.environment == req.environment:
                     response.success = True
-                    response.message = " Poi %s/%s found" % (req.name,req.environement)
+                    response.message = " Poi %s/%s found" % (req.name,req.environment)
                     response.p = poi
                     return response
         else:
             response.success = False
-            response.message = " Poi %s/%s Not found, empty list" % (req.name,req.environement)
+            response.message = " Poi %s/%s Not found, empty list" % (req.name,req.environment)
             return response
         response.success = False
-        response.message = " Poi %s/%s Not found" % (req.name,req.environement)
+        response.message = " Poi %s/%s Not found" % (req.name,req.environment)
         return response
 
     def get_poi_list_cb(self, req):
@@ -233,42 +235,42 @@ class PoiManager(RComponent):
         num = 0
         if len(self.pose_list) > 0:   
             for poi in self.pose_list: 
-                if poi.environement == req.environement:         
+                if poi.environment == req.environment:         
                     response.p_list.append(poi)
                     num = num + 1
             if num>0:
                 response.success = True
-                response.message = "  Found %d POIs from %s " % (num,req.environement)
+                response.message = "  Found %d POIs from %s " % (num,req.environment)
             else:
                 response.success = False
-                response.message = "  Found %d POIs from %s " % (num,req.environement)
+                response.message = "  Found %d POIs from %s " % (num,req.environment)
         else:
             response.success = False
-            response.message = " Pois from %s Not found, empty list" % (req.environement)
+            response.message = " Pois from %s Not found, empty list" % (req.environment)
         return response
 
     def try_create_env(self,dict_name,new_env):
         try:
-            if len(dict_name['environements'][new_env])==0:
+            if len(dict_name['environments'][new_env])==0:
                 return 
         except:
-           dict_name['environements'][new_env] = {}
-           dict_name['environements'][new_env]['points'] = {} 
+           dict_name['environments'][new_env] = {}
+           dict_name['environments'][new_env]['points'] = {} 
         return
 
     def try_create_point(self,dict_name,new_env,point_name):
         try:
-            if len(dict_name['environements'][new_env]['points'][point_name])==0:
+            if len(dict_name['environments'][new_env]['points'][point_name])==0:
                 return 
         except:
-           dict_name['environements'][new_env]['points'][point_name] = {} 
+           dict_name['environments'][new_env]['points'][point_name] = {} 
         return
 
     def add_poi_by_params_cb(self,req):
         p = LabeledPose()
         p.name = req.name
         p.frame_id = req.frame_id
-        p.environement = req.environement
+        p.environment = req.environment
         p.params = req.params
 
         quaternion = tf.transformations.quaternion_from_euler(req.roll,req.pitch,req.yaw)
@@ -291,13 +293,59 @@ class PoiManager(RComponent):
         response.message = ret.message
 
         return response
+
+    def delete_environment_cb(self,req):
+        response = DeleteEnvironmentResponse()
+        try:
+            print ("AAAAAA")
+            del (self.pose_dict['environments'][req.environment]['points'])          
+            del (self.pose_dict['environments'][req.environment])            
+            yaml_file = file(self.yaml_path, 'w')
+            yaml.dump(self.pose_dict, yaml_file)
+            response.success = True    
+            response.message = "Environment %s deleted" % (req.environment )
+
+        except Exception as identifier:
+            msg = "%s::Error deleting environment %s. Error msg:%s" % (rospy.get_name(),req.environment,identifier)
+            response.success = False    
+            response.message = msg          
+        return response
+        
+
+
+    def delete_empty_environment(self,envir):
+        try:
+            if len(self.pose_dict['environments'][envir]['points'])==0:                
+                del (self.pose_dict['environments'][envir]['points'])
+                del (self.pose_dict['environments'][envir])
+            else:
+                print (" Not empty",self.pose_dict['environments'][envir]['points'])                
+        except:            
+            return
+        return    
+         
+
+    def delete_poi_cb(self,req):
+        response = DeletePOIResponse()
+        try:
+            del (self.pose_dict['environments'][req.environment]['points'][req.name])
+            
+            self.delete_empty_environment(req.environment)
+            response.success = True    
+            response.message = "point %s from environment %s deleted" % (req.name,req.environment )
+            yaml_file = file(self.yaml_path, 'w')
+            yaml.dump(self.pose_dict, yaml_file)
+        except Exception as identifier:
+            msg = "%s::Error deleting point %s from environment %s. Error msg:%s" % (rospy.get_name(),req.name,req.environment,identifier)
+            response.success = False   
+            response.message = msg          
+        return response
     
     def add_poi_cb(self,req):
         response = AddPOIResponse()
-        print (req)
         try:
-            self.try_create_env(self.pose_dict,req.p.environement)
-            self.try_create_point(self.pose_dict,req.p.environement,req.p.name)
+            self.try_create_env(self.pose_dict,req.p.environment)
+            self.try_create_point(self.pose_dict,req.p.environment,req.p.name)
             point  = {'position':[req.p.pose.position.x,
                                 req.p.pose.position.y,
                                 req.p.pose.position.z],
@@ -307,17 +355,22 @@ class PoiManager(RComponent):
                                     req.p.pose.orientation.w],
                     'frame_id':req.p.frame_id,
                     'params':req.p.params} 
-            self.pose_dict['environements'][req.p.environement]['points'][req.p.name] = point
+            self.pose_dict['environments'][req.p.environment]['points'][req.p.name] = point
+           
+            self.pose_list.append(req.p)
+
             success,msg=self.manage_read_data()
+            yaml_file = file(self.yaml_path, 'w')
+            yaml.dump(self.pose_dict, yaml_file)
             if (success==False):
                 response.success = False    
-                response.message = "point %s from environement %s Not created/modified ERROR adding to pose list" % (req.p.name,req.p.environement )    
+                response.message = "point %s from environment %s Not created/modified ERROR adding to pose list" % (req.p.name,req.p.environment )    
             response.success = True    
-            response.message = "point %s from environement %s created/modified" % (req.p.name,req.p.environement )
+            response.message = "point %s from environment %s created/modified" % (req.p.name,req.p.environment )
             
 
         except Exception as identifier:
-            msg = "%s::Error adding point %s from environement %s. Error msg:%s" % (rospy.get_name(),req.p.name,req.p.environement,identifier)
+            msg = "%s::Error adding point %s from environment %s. Error msg:%s" % (rospy.get_name(),req.p.name,req.p.environment,identifier)
             response.success = True    
             response.message = msg  
         

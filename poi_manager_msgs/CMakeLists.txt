@@ -15,6 +15,8 @@ add_service_files(
   AddPOI.srv
   AddPOI_params.srv
   GetPOI.srv
+  DeletePOI.srv
+  DeleteEnvironment.srv
   GetPOIs.srv
   ReadPOIs.srv
   UpdatePOIs.srv

@@ -20,7 +20,7 @@ add_service_files(
   GetPOIs.srv
   ReadPOIs.srv
   UpdatePOIs.srv
-
+  GetEnvironments.srv
 )
 
 generate_messages(

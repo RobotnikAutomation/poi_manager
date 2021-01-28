@@ -22,13 +22,9 @@ from visualization_msgs.msg import MarkerArray, Marker
 class PoiManager(RComponent):
 
     def __init__(self):
-
         self.pose_list = []
         self.pose_dict = {'environments':{}}
-
         RComponent.__init__(self)
-
-
 
     def ros_read_params(self):
         """Gets params from param server"""
@@ -53,6 +49,7 @@ class PoiManager(RComponent):
         self.service_get_poi = rospy.Service('~get_poi', GetPOI, self.get_poi_cb)
         self.service_delete_poi = rospy.Service('~delete_poi', DeletePOI, self.delete_poi_cb)
         self.service_delete_envir = rospy.Service('~delete_environment', DeleteEnvironment, self.delete_environment_cb)
+        self.service_get_envir = rospy.Service('~get_environments', GetEnvironments, self.get_environments_cb)
         self.service_get_poi_list = rospy.Service('~get_poi_list', GetPOIs, self.get_poi_list_cb)
         self.service_add_poi = rospy.Service('~add_poi', AddPOI, self.add_poi_cb)
         self.service_add_poi_by_params = rospy.Service('~add_poi_by_params', AddPOI_params, self.add_poi_by_params_cb)
@@ -166,7 +163,6 @@ class PoiManager(RComponent):
             self.update_marker_array()
 
     def create_marker(self, point, marker_type):
-
         marker = Marker()
         marker.header.frame_id = point.frame_id
         marker.header.stamp = rospy.Time()
@@ -228,6 +224,12 @@ class PoiManager(RComponent):
             return response
         response.success = False
         response.message = " Poi %s/%s Not found" % (req.name,req.environment)
+        return response
+
+    def get_environments_cb(self, req):
+        response = GetEnvironmentsResponse()
+        for key,value in self.pose_dict['environments'].items():
+            response.environments.append(key)
         return response
 
     def get_poi_list_cb(self, req):
@@ -297,7 +299,6 @@ class PoiManager(RComponent):
     def delete_environment_cb(self,req):
         response = DeleteEnvironmentResponse()
         try:
-            print ("AAAAAA")
             del (self.pose_dict['environments'][req.environment]['points'])          
             del (self.pose_dict['environments'][req.environment])            
             yaml_file = file(self.yaml_path, 'w')
@@ -318,8 +319,6 @@ class PoiManager(RComponent):
             if len(self.pose_dict['environments'][envir]['points'])==0:                
                 del (self.pose_dict['environments'][envir]['points'])
                 del (self.pose_dict['environments'][envir])
-            else:
-                print (" Not empty",self.pose_dict['environments'][envir]['points'])                
         except:            
             return
         return    

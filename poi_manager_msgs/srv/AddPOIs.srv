@@ -1,5 +1,4 @@
 poi_manager_msgs/LabeledPose[] pose_list
-string environment
 ---
 bool success
 string message

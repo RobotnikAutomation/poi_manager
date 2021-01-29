@@ -44,8 +44,8 @@ class PoiManager(RComponent):
         """Creates and inits ROS components"""
         RComponent.ros_setup(self)
 
-        self.service_read_yaml = rospy.Service('~read_pois', ReadPOIs, self.handle_labeled_pose_list)
-        self.service_write_data = rospy.Service('~update_pois', UpdatePOIs, self.handle_updated_list)
+        self.service_read_yaml = rospy.Service('~read_pois', ReadPOIs, self.read_pois_cb)
+        self.service_add_pois= rospy.Service('~add_pois', AddPOIs, self.add_pois_cb)
         self.service_get_poi = rospy.Service('~get_poi', GetPOI, self.get_poi_cb)
         self.service_delete_poi = rospy.Service('~delete_poi', DeletePOI, self.delete_poi_cb)
         self.service_delete_envir = rospy.Service('~delete_environment', DeleteEnvironment, self.delete_environment_cb)
@@ -130,7 +130,7 @@ class PoiManager(RComponent):
 
     def init_state(self):
         req = ReadPOIsRequest()
-        self.handle_labeled_pose_list(req)         
+        self.read_pois_cb(req)         
         self.switch_to_state(State.READY_STATE)
 
     #def ready_state(self):
@@ -138,14 +138,9 @@ class PoiManager(RComponent):
         #if self.publish_markers:
         #    self.update_marker_array()
 
-    def update_yaml(self, req):
+    def update_yaml(self):
         yaml_file = file(self.yaml_path, 'w')
-        pose_list = req.pose_list
-        #self.pose_dict = {}
-        #for elem in pose_list:
-        #    self.pose_dict[elem.label] = [elem.pose.x, elem.pose.y, elem.pose.theta]
-        yaml.dump(self.pose_dict, yaml_file)
-        
+        yaml.dump(self.pose_dict, yaml_file)        
         if self.publish_markers:
             self.update_marker_array()
 
@@ -201,18 +196,30 @@ class PoiManager(RComponent):
             marker.color.b = 1.0
         return marker
 
-    def handle_labeled_pose_list(self, req):
+    def read_pois_cb(self, req):
         success,msg = self.parse_yaml()        
         if (success==False):
             return ReadPOIsResponse(success,msg,self.pose_list)    
         success,msg = self.manage_read_data()
-        rospy.loginfo("%s::handle_labeled_pose_list: read_pois service done", self._node_name)
+        rospy.loginfo("%s::Read Pois service done", self._node_name)
         return ReadPOIsResponse(success,msg,self.pose_list)
 
-    def handle_updated_list(self, req):
-        self.update_yaml(req)
-        rospy.loginfo("%s::handle_updated_list: update_pois service done", self._node_name)
-        return UpdatePOIsResponse()
+    def add_pois_cb(self, req):
+        response = AddPOIsResponse()
+        req_add_poi=AddPOIRequest()
+        for i in req.pose_list:
+            req_add_poi.p = i
+            ret = self.add_poi_cb(req_add_poi)
+            if ret.success == False:
+                response.success = False
+                response.message = ret.message
+                return response
+        
+        response.success = True
+        response.message = " POIs Updated OK"
+        rospy.loginfo("%s::read_pois_cb: Read pois service done", self._node_name)
+        return response
+        
 
     def get_poi_cb(self, req):
         response = GetPOIResponse()

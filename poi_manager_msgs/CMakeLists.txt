@@ -19,7 +19,7 @@ add_service_files(
   DeleteEnvironment.srv
   GetPOIs.srv
   ReadPOIs.srv
-  UpdatePOIs.srv
+  AddPOIs.srv
   GetEnvironments.srv
 )
 

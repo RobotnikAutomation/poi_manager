@@ -47,6 +47,7 @@ class PoiManager(RComponent):
         self.service_read_yaml = rospy.Service('~read_pois', ReadPOIs, self.read_pois_cb)
         self.service_add_pois= rospy.Service('~add_pois', AddPOIs, self.add_pois_cb)
         self.service_get_poi = rospy.Service('~get_poi', GetPOI, self.get_poi_cb)
+        self.service_get_poi = rospy.Service('~get_poi_params', GetPOI_params, self.get_poi_params_cb)
         self.service_delete_poi = rospy.Service('~delete_poi', DeletePOI, self.delete_poi_cb)
         self.service_delete_envir = rospy.Service('~delete_environment', DeleteEnvironment, self.delete_environment_cb)
         self.service_get_envir = rospy.Service('~get_environments', GetEnvironments, self.get_environments_cb)
@@ -229,6 +230,34 @@ class PoiManager(RComponent):
                     response.success = True
                     response.message = " Poi %s/%s found" % (req.name,req.environment)
                     response.p = poi
+                    return response
+        else:
+            response.success = False
+            response.message = " Poi %s/%s Not found, empty list" % (req.name,req.environment)
+            return response
+        response.success = False
+        response.message = " Poi %s/%s Not found" % (req.name,req.environment)
+        return response
+
+    def get_poi_params_cb(self, req):
+        response = GetPOI_paramsResponse()
+        if len(self.pose_list) > 0:            
+            for poi in self.pose_list:                
+                if poi.name == req.name and poi.environment == req.environment:
+                    response.success = True
+                    response.message = " Poi %s/%s found" % (req.name,req.environment)
+                    response.name = poi.name
+                    response.environment = poi.environment
+                    response.frame_id = poi.frame_id
+                    response.params = poi.params
+                    response.x = poi.pose.position.x
+                    response.y = poi.pose.position.y
+                    response.z = poi.pose.position.z
+                    q = [poi.pose.orientation.x,poi.pose.orientation.y,poi.pose.orientation.z,poi.pose.orientation.w ]
+                    euler = tf.transformations.euler_from_quaternion(q)
+                    response.roll = euler[0]
+                    response.pitch = euler[1]
+                    response.yaw = euler[2]
                     return response
         else:
             response.success = False

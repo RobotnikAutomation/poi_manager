@@ -119,7 +119,7 @@ class PoiManager(RComponent):
                             rospy.loginfo("%s::Found other property in point list: %s", rospy.get_name(),point_list_key)
         except Exception as identifier:
             msg = "%s::Error reading yaml file: %s" % (rospy.get_name(),identifier)
-            rospy.logerror(msg)  
+            rospy.logerr(msg)  
             return False,msg  
         msg = " Read %d environments and %d points" % (envir_n,points_n)
         

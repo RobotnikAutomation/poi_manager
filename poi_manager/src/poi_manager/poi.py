@@ -320,6 +320,7 @@ class PoiManager(RComponent):
         p.pose.position.x=req.x
         p.pose.position.y=req.y
         p.pose.position.z=req.z
+        #print (quaternion)
         p.pose.orientation.x = quaternion[0]
         p.pose.orientation.y = quaternion[1]
         p.pose.orientation.z = quaternion[2]
@@ -346,11 +347,13 @@ class PoiManager(RComponent):
             yaml.dump(self.pose_dict, yaml_file)
             response.success = True    
             response.message = "Environment %s deleted" % (req.environment )
+            #print (response.message)
 
         except Exception as identifier:
             msg = "%s::Error deleting environment %s. Error msg:%s" % (rospy.get_name(),req.environment,identifier)
             response.success = False    
-            response.message = msg          
+            response.message = msg    
+            #print (response.message)      
         return response
         
 
@@ -386,22 +389,25 @@ class PoiManager(RComponent):
         try:
             self.try_create_env(self.pose_dict,req.p.environment)
             self.try_create_point(self.pose_dict,req.p.environment,req.p.name)
-            point  = {'position':[req.p.pose.position.x,
-                                req.p.pose.position.y,
-                                req.p.pose.position.z],
-                    'orientation':[req.p.pose.orientation.x,
-                                    req.p.pose.orientation.y,
-                                    req.p.pose.orientation.z,
-                                    req.p.pose.orientation.w],
+            point  = {'position':[float(req.p.pose.position.x),
+                                  float(req.p.pose.position.y),
+                                  float(req.p.pose.position.z)],
+                    'orientation':[ float(req.p.pose.orientation.x),
+                                    float(req.p.pose.orientation.y),
+                                    float(req.p.pose.orientation.z),
+                                    float(req.p.pose.orientation.w)],
                     'frame_id':req.p.frame_id,
                     'params':req.p.params} 
             self.pose_dict['environments'][req.p.environment]['points'][req.p.name] = point
            
             self.pose_list.append(req.p)
 
+            #print (self.pose_list)
+
             success,msg=self.manage_read_data()
             yaml_file = file(self.yaml_path, 'w')
-            yaml.dump(self.pose_dict, yaml_file)
+            yaml.dump(self.pose_dict, yaml_file, default_flow_style=False)
+
             if (success==False):
                 response.success = False    
                 response.message = "point %s from environment %s Not created/modified ERROR adding to pose list" % (req.p.name,req.p.environment )    
@@ -411,7 +417,7 @@ class PoiManager(RComponent):
 
         except Exception as identifier:
             msg = "%s::Error adding point %s from environment %s. Error msg:%s" % (rospy.get_name(),req.p.name,req.p.environment,identifier)
-            response.success = True    
+            response.success = False    
             response.message = msg  
         
         return response

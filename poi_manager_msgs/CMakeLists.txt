@@ -22,6 +22,7 @@ add_service_files(
   ReadPOIs.srv
   AddPOIs.srv
   GetEnvironments.srv
+  GetPoseTrigger.srv
 )
 
 generate_messages(

@@ -36,7 +36,8 @@ class PoiManager(RComponent):
         self.yaml_path = self.folder + '/' + self.filename+'.yaml'
 
         self.publish_markers = rospy.get_param('~publish_markers', False)
-        self.frame_id = rospy.get_param('~frame_id', 'map')
+        self.frame_id = rospy.get_param('~frame_id', 'robot_map')
+        self.robot_frame_id = rospy.get_param("~robot_frame_id", "robot_base_footprint")
 
         rospy.loginfo('%s::_init_: config file path: %s', self._node_name, self.yaml_path)
 
@@ -54,6 +55,7 @@ class PoiManager(RComponent):
         self.service_get_poi_list = rospy.Service('~get_poi_list', GetPOIs, self.get_poi_list_cb)
         self.service_add_poi = rospy.Service('~add_poi', AddPOI, self.add_poi_cb)
         self.service_add_poi_by_params = rospy.Service('~add_poi_by_params', AddPOI_params, self.add_poi_by_params_cb)
+        
         if self.publish_markers:
             self.marker_array = MarkerArray()
 

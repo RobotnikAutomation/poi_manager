@@ -11,6 +11,7 @@ from geometry_msgs.msg import Pose2D
 from robotnik_msgs.msg import ptz
 from std_msgs.msg import Empty
 from visualization_msgs.msg import MarkerArray, Marker
+from robotnik_msgs.srv import GetPOI, GetPOIResponse
 
 class ManageYAML:
 
@@ -24,6 +25,7 @@ class ManageYAML:
         self.pose_dict = {}
         self.service_read_yaml = rospy.Service('~read_pois', ReadPOIs, self.handle_labeled_pose_list)
         self.service_write_data = rospy.Service('~update_pois', UpdatePOIs, self.handle_updated_list)
+        self.service_get_poi = rospy.Service('~get_poi', GetPOI, self.get_poi_cb)
         
         self.publish_markers = rospy.get_param('~publish_markers',False)
         if self.publish_markers:
@@ -130,6 +132,20 @@ class ManageYAML:
         rospy.loginfo("%s::handle_updated_list: update_pois service done", rospy.get_name())
         return UpdatePOIsResponse()
     
+    def get_poi_cb(self, req):
+        name = req.name
+        response = GetPOIResponse()
+        if len(self.pose_list) > 0:
+            for poi in self.pose_list:
+                if poi.label == name:
+                    response.success = True
+                    response.pose = poi.pose
+                    return response
+        else:
+            response.success = False
+        
+        return response
+
 
 def main():
     rospy.init_node('manage_yaml')

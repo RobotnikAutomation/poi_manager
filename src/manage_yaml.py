@@ -12,6 +12,7 @@ from robotnik_msgs.msg import ptz
 from std_msgs.msg import Empty
 from visualization_msgs.msg import MarkerArray, Marker
 from robotnik_msgs.srv import GetPOI, GetPOIResponse
+from robotnik_msgs.srv import GetPTZ, GetPTZResponse
 
 class ManageYAML:
 
@@ -26,6 +27,7 @@ class ManageYAML:
         self.service_read_yaml = rospy.Service('~read_pois', ReadPOIs, self.handle_labeled_pose_list)
         self.service_write_data = rospy.Service('~update_pois', UpdatePOIs, self.handle_updated_list)
         self.service_get_poi = rospy.Service('~get_poi', GetPOI, self.get_poi_cb)
+        self.service_get_ptz = rospy.Service('~get_ptz', GetPTZ, self.get_ptz_cb)
         
         self.publish_markers = rospy.get_param('~publish_markers',False)
         if self.publish_markers:
@@ -146,6 +148,23 @@ class ManageYAML:
         
         return response
 
+    def get_ptz_cb(self, req):
+        name = req.name
+        response = GetPTZResponse()
+        if len(self.pose_list) > 0:
+            for ptz in self.pose_list:
+                if ptz.label == name:
+                    response.success = True
+                    response.pan = ptz.ptz_pose.pan
+                    response.tilt = ptz.ptz_pose.tilt
+                    response.zoom = ptz.ptz_pose.zoom
+                    # pose_list sets relative param to false by default
+                    response.relative = ptz.ptz_pose.relative 
+                    return response
+        else:
+            response.success = False
+        
+        return response
 
 def main():
     rospy.init_node('manage_yaml')

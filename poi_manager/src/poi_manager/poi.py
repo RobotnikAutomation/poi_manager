@@ -211,12 +211,13 @@ class PoiManager(RComponent):
         response = AddPOIsResponse()
         req_add_poi=AddPOIRequest()
         for i in req.pose_list:
-            req_add_poi.p = i
-            ret = self.add_poi_cb(req_add_poi)
-            if ret.success == False:
-                response.success = False
-                response.message = ret.message
-                return response
+            if(i.environment != ""):
+              req_add_poi.p = i
+              ret = self.add_poi_cb(req_add_poi)
+              if ret.success == False:
+                  response.success = False
+                  response.message = ret.message
+                  return response
         
         response.success = True
         response.message = " POIs Updated OK"
@@ -226,6 +227,10 @@ class PoiManager(RComponent):
 
     def get_poi_cb(self, req):
         response = GetPOIResponse()
+        if( req.environment == ""):
+	    response.success = True
+            response.message = "The environment is empty, this enviroment has 0 points"
+            return response
         if len(self.pose_list) > 0:            
             for poi in self.pose_list:                
                 if poi.name == req.name and poi.environment == req.environment:
@@ -280,10 +285,10 @@ class PoiManager(RComponent):
         num = 0
         if len(self.pose_list) > 0:   
             for poi in self.pose_list: 
-                if poi.environment == req.environment:         
+                if poi.environment == req.environment and req.environment!="":         
                     response.p_list.append(poi)
                     num = num + 1
-            if num>0:
+            if num>=0:
                 response.success = True
                 response.message = "  Found %d POIs from %s " % (num,req.environment)
             else:
@@ -312,6 +317,12 @@ class PoiManager(RComponent):
         return
 
     def add_poi_by_params_cb(self,req):
+        if(req.environment == ""):
+	   response = AddPOI_paramsResponse()
+           response.success = False
+           response.message = "The environment is empty"
+           return response
+
         p = LabeledPose()
         p.name = req.name
         p.frame_id = req.frame_id
@@ -342,6 +353,10 @@ class PoiManager(RComponent):
 
     def delete_environment_cb(self,req):
         response = DeleteEnvironmentResponse()
+	if req.environment == "":
+	    response.success = False    
+            response.message = "The environment is empty"
+	    return response
         try:
             del (self.pose_dict['environments'][req.environment]['points'])          
             del (self.pose_dict['environments'][req.environment])            
@@ -388,6 +403,10 @@ class PoiManager(RComponent):
     
     def add_poi_cb(self,req):
         response = AddPOIResponse()
+        if(req.p.environment == ""):
+	    response.message = "The environment is empty"
+	    response.success = False
+            return response
         try:
             self.try_create_env(self.pose_dict,req.p.environment)
             self.try_create_point(self.pose_dict,req.p.environment,req.p.name)

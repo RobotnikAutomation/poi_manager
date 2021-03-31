@@ -12,7 +12,6 @@ from robotnik_msgs.msg import ptz
 from std_msgs.msg import Empty
 from visualization_msgs.msg import MarkerArray, Marker
 from robotnik_msgs.srv import GetPOI, GetPOIResponse
-from robotnik_msgs.srv import GetPTZ, GetPTZResponse
 
 class ManageYAML:
 
@@ -20,15 +19,13 @@ class ManageYAML:
         rospack = rospkg.RosPack()
         self.filename = rospy.get_param('~filename', 'test')
         self.folder = rospy.get_param('~folder', os.path.join(rospack.get_path('poi_manager'), 'config'))
-	self.yaml_path =  self.folder +'/'+ self.filename+'.yaml'
-	
+        self.yaml_path =  self.folder +'/'+ self.filename+'.yaml'
         self.pose_list = []
         self.pose_dict = {}
         self.service_read_yaml = rospy.Service('~read_pois', ReadPOIs, self.handle_labeled_pose_list)
         self.service_write_data = rospy.Service('~update_pois', UpdatePOIs, self.handle_updated_list)
+        self.service_add_poi = rospy.Service('~add_poi', AddPOI , self.handle_add_poi)
         self.service_get_poi = rospy.Service('~get_poi', GetPOI, self.get_poi_cb)
-        self.service_get_ptz = rospy.Service('~get_ptz', GetPTZ, self.get_ptz_cb)
-        
         self.publish_markers = rospy.get_param('~publish_markers',False)
         if self.publish_markers:
             self.marker_array = MarkerArray()
@@ -77,6 +74,24 @@ class ManageYAML:
 
         if self.publish_markers:
             self.update_marker_array()
+
+
+    def add_poi_to_yaml(self, req):
+                
+        new_poi = {
+            req.pose.label : {
+                'pose': [round(req.pose.pose.x, 4), round(req.pose.pose.y,4), round(req.pose.pose.theta,4)], 
+                'ptz_pose': [round(req.pose.ptz_pose.pan,4), round(req.pose.ptz_pose.tilt,4) , req.pose.ptz_pose.zoom], 
+            }
+        }
+
+        yaml_file = file(self.yaml_path, 'r')
+        new_yaml_file = yaml.safe_load(yaml_file) 
+        new_yaml_file.update(new_poi)
+
+        yaml_file = file(self.yaml_path, 'w')
+        yaml.safe_dump(new_yaml_file, yaml_file) 
+
 
     def update_marker_array(self):
         marker_array = MarkerArray()
@@ -134,6 +149,11 @@ class ManageYAML:
         rospy.loginfo("%s::handle_updated_list: update_pois service done", rospy.get_name())
         return UpdatePOIsResponse()
     
+    def handle_add_poi(self, req):
+        self.add_poi_to_yaml(req)
+        rospy.loginfo("%s::handle_add_poi: add_poi service done", rospy.get_name())
+        return AddPOIResponse()
+
     def get_poi_cb(self, req):
         name = req.name
         response = GetPOIResponse()
@@ -148,23 +168,6 @@ class ManageYAML:
         
         return response
 
-    def get_ptz_cb(self, req):
-        name = req.name
-        response = GetPTZResponse()
-        if len(self.pose_list) > 0:
-            for ptz in self.pose_list:
-                if ptz.label == name:
-                    response.success = True
-                    response.pan = ptz.ptz_pose.pan
-                    response.tilt = ptz.ptz_pose.tilt
-                    response.zoom = ptz.ptz_pose.zoom
-                    # pose_list sets relative param to false by default
-                    response.relative = ptz.ptz_pose.relative 
-                    return response
-        else:
-            response.success = False
-        
-        return response
 
 def main():
     rospy.init_node('manage_yaml')

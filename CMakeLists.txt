@@ -61,6 +61,7 @@ find_package(catkin REQUIRED COMPONENTS
     FILES
     ReadPOIs.srv
     UpdatePOIs.srv
+    AddPOI.srv
   )
 
 ## Generate actions in the 'action' folder

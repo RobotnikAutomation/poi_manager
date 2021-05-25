@@ -4,6 +4,7 @@ import rospy
 import yaml
 import rospkg
 import os
+from datetime import datetime
 from geometry_msgs.msg import Pose2D
 from robotnik_msgs.msg import ptz
 from poi_manager.msg import *
@@ -26,6 +27,7 @@ class SaveRobotPOI:
         self.yaml_path =  self.folder +'/'+ self.filename+'.yaml'
         self.global_frame = rospy.get_param('~global_frame', 'map')
         self.base_frame = rospy.get_param('~base_frame', 'base_link')
+        self.has_ptz = rospy.get_param('~has_ptz', False)
         self.ptz_frame = rospy.get_param('~ptz_frame', 'ptz_base_link')
 
         self.service_get_poi = rospy.Service('poi_manager/save_robot_poi', SetString , self.set_poi_cb)
@@ -58,30 +60,42 @@ class SaveRobotPOI:
 
         ptz_pose = ptz()
 
-        self.listener.waitForTransform(self.base_frame, self.ptz_frame, rospy.Time(), rospy.Duration(4.0))
-        (position,orientation) = self.listener.lookupTransform(self.base_frame, self.ptz_frame, rospy.Time(0))
+        if self.has_ptz:
 
-        euler = euler_from_quaternion(orientation)
+            self.listener.waitForTransform(self.base_frame, self.ptz_frame, rospy.Time(), rospy.Duration(4.0))
+            (position,orientation) = self.listener.lookupTransform(self.base_frame, self.ptz_frame, rospy.Time(0))
 
-        ptz_pose.pan = euler[2]
-        ptz_pose.tilt = euler[1]
-        ptz_pose.zoom = euler[0]
-        ptz_pose.relative = False
+            euler = euler_from_quaternion(orientation)
+
+            ptz_pose.pan = euler[2]
+            ptz_pose.tilt = euler[1]
+            ptz_pose.zoom = euler[0]
+            ptz_pose.relative = False
+
+        else:
+            ptz_pose.pan = 0.0
+            ptz_pose.tilt = 0.0
+            ptz_pose.zoom = 0
+            ptz_pose.relative = False
 
         # rospy.loginfo("PTZ current position is: " + str(ptz_pose))
 
         return ptz_pose
 
     def set_poi_cb(self, req):
-      
-        name = req.data
+    
+        now = datetime.now()
+        date_name = now.strftime("%d-%m-%Y-%H:%M:%S")
+        rospy.loginfo("poi_manager/save_robot_poi::set_poi_cb: New point named as " + date_name)
+
+        name = date_name
         response = SetStringResponse()
         
         robot_pose = self.get_robot_pose()
         ptz_pose = self.get_ptz_pose()
 
         poi = AddPOIRequest()
-        poi.pose.label = req.data
+        poi.pose.label = name
         poi.pose.pose.x = robot_pose.x
         poi.pose.pose.y = robot_pose.y
         poi.pose.pose.theta = robot_pose.theta

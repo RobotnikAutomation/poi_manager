@@ -3,6 +3,7 @@
 	<arg name="id_robot" default="robot"/>
 	<arg name="node_name" default="poi_manager"/>
 	<arg name="publish_markers" default="false"/>
+	<arg name="publish_ptz_markers" default="false"/>
 	<arg name="marker_topic" default="markers"/>
 	<arg name="frequency" default="0.5"/>
 	<arg name="frame_id" default="robot_map"/>
@@ -13,6 +14,7 @@
 		<param name="folder" value="$(arg folder)"/>
 		<param name="filename" value="$(arg filename)"/>
 		<param name="publish_markers" value="$(arg publish_markers)"/>
+		<param name="publish_ptz_markers" value="$(arg publish_ptz_markers)"/>
 		<param name="marker_topic" value="$(arg marker_topic)" if="$(arg publish_markers)"/>
 		<param name="frequency" value="$(arg frequency)" if="$(arg publish_markers)"/>
 		<param name="frame_id" value="$(arg frame_id)" if="$(arg publish_markers)"/>	

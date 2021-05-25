@@ -29,6 +29,7 @@ class ManageYAML:
         self.service_get_poi = rospy.Service('~get_poi', GetPOI, self.get_poi_cb)
         self.service_get_ptz = rospy.Service('~get_ptz', GetPTZ, self.get_ptz_cb)
         self.publish_markers = rospy.get_param('~publish_markers',False)
+        self.publish_ptz_markers = rospy.get_param('~publish_ptz_markers',False)
         if self.publish_markers:
             self.marker_array = MarkerArray()
             self.marker_topic = rospy.get_param('~marker_topic', 'markers')
@@ -94,50 +95,89 @@ class ManageYAML:
         yaml_file = file(self.yaml_path, 'w')
         yaml.safe_dump(new_yaml_file, yaml_file) 
 
+        if self.publish_markers:
+            self.parse_yaml()
+            self.update_marker_array()
+
 
     def update_marker_array(self):
         marker_array = MarkerArray()
         for item in self.pose_dict.items():
-            # Two markers are created for each item
-            # The first one shows the pose
-            marker_arrow = self.create_marker(item, 'arrow')
-            # The second one shows the label
-            marker_text = self.create_marker(item, 'text')
+
+            marker_arrow = self.create_marker(item, 'pose', 'arrow', 0)
+            marker_text = self.create_marker(item, 'pose', 'text', 1)
             marker_array.markers.append(marker_arrow)
             marker_array.markers.append(marker_text)
+            
+            if self.publish_ptz_markers == True:
+                marker_arrow_ptz = self.create_marker(item, 'ptz_pose', 'arrow', 2)
+                marker_text_ptz = self.create_marker(item, 'ptz_pose', 'text', 3)
+                marker_array.markers.append(marker_arrow_ptz)
+                marker_array.markers.append(marker_text_ptz)  
+
         self.marker_array = marker_array
         self.marker_array_publisher.publish(self.marker_array)
 
-    def create_marker(self, data, marker_type):
+    def create_marker(self, data, data_type, marker_type, marker_id):
+     
         marker = Marker()
         marker.header.frame_id = self.frame_id
         marker.header.stamp = rospy.Time()
         marker.ns = data[0]
         marker.action = Marker.ADD
-        marker.pose.position.x = data[1][0]
-        marker.pose.position.y = data[1][1]
-        quaternion = tf.transformations.quaternion_from_euler(0, 0, data[1][2])
+
+        marker.lifetime = rospy.Duration(1/self.frequency)
+
+        if data_type == 'pose':
+            marker.pose.position.x = data[1]['pose'][0]
+            marker.pose.position.y = data[1]['pose'][1]
+            quaternion = tf.transformations.quaternion_from_euler(0, 0, data[1]['pose'][2])
+            # TODO parameterize arrow color
+            marker.color.a = 1.0 
+            marker.color.g = 1.0
+
+        if data_type == 'ptz_pose':
+            marker.pose.position.x = data[1]['pose'][0]
+            marker.pose.position.y = data[1]['pose'][1]
+            marker.pose.position.z = 1
+            quaternion = tf.transformations.quaternion_from_euler(0, data[1]['ptz_pose'][0], data[1]['ptz_pose'][1])
+            # TODO parameterize arrow color
+            marker.color.a = 1.0 
+            marker.color.r = 1.0
+            marker.color.b = 1.0
+
         marker.pose.orientation.x = quaternion[0]
         marker.pose.orientation.y = quaternion[1]
         marker.pose.orientation.z = quaternion[2]
         marker.pose.orientation.w = quaternion[3]
-        marker.scale.x = 1
-        marker.scale.y = 0.1
-        marker.scale.z = 0.1
-        # TODO parameterize arrow color
-        marker.color.a = 1.0 
-        marker.color.g = 1.0
-        marker.lifetime = rospy.Duration(1/self.frequency)
+
+
         if marker_type == 'arrow':
-            marker.id = 0
+            marker.id = marker_id
             marker.type = Marker.ARROW
+            marker.scale.x = 0.5
+            marker.scale.y = 0.05
+            marker.scale.z = 0.05
+ 
         else:
-            marker.id = 1
+            marker.id = marker_id
             marker.type = Marker.TEXT_VIEW_FACING
-            marker.text = data[0]
-            marker.pose.position.z = 0.5
+            marker.scale.z = 0.2
             marker.color.r = 1.0
             marker.color.b = 1.0 
+            marker.color.g = 1.0 
+            if data_type == 'pose':
+                # marker.text = data[0] + "\n" + "x: {:.2f} ".format(data[1]['pose'][0])  + "y: {:.2f} ".format(data[1]['pose'][1])  + "a: {:.2f} ".format(data[1]['pose'][2])
+                if self.publish_ptz_markers == False:
+                    marker.text = data[0]
+                marker.pose.position.z = 0.5
+
+            if data_type == 'ptz_pose':
+                # marker.text = data[0] + "\n" + "pan: {:.2f} ".format(data[1]['ptz_pose'][0])  + "tilt: {:.2f} ".format(data[1]['ptz_pose'][1])  + "zoom: " + str(data[1]['pose'][2])
+                marker.text = data[0]  + "\n" + "zoom: " + str(data[1]['pose'][2])
+                marker.pose.position.z = 1.5
+     
+
         return marker
 
     def handle_labeled_pose_list(self, req):

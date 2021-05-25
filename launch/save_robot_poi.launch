@@ -8,6 +8,7 @@
 
     <arg name="global_frame" default="robot_map" />
     <arg name="base_frame" default="robot_base_link" />
+	<arg name="has_ptz" default="false" />
 	<arg name="ptz_frame" default="robot_flir_ptu_5_stand_link" />
 
 	<node pkg="poi_manager" name="$(arg node_name)" type="save_robot_poi.py" output="screen">
@@ -15,6 +16,7 @@
 		<param name="filename" value="$(arg filename)"/>
 		<param name="global_frame" value="$(arg global_frame)" />   
         <param name="base_frame" value="$(arg base_frame)" /> 
+		<param name="has_ptz" value="$(arg has_ptz)" /> 
 		<param name="ptz_frame" value="$(arg ptz_frame)" /> 
 	</node>
 

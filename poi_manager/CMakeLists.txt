@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   tf
   robotnik_msgs
+  robot_local_control_msgs
 )
 
 catkin_python_setup()
@@ -33,6 +34,9 @@ catkin_install_python(PROGRAMS src/poi_manager/poi_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 catkin_install_python(PROGRAMS src/poi_manager/poi.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+catkin_install_python(PROGRAMS src/poi_manager/poi_marker.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 

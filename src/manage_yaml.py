@@ -59,7 +59,7 @@ class ManageYAML:
     def manage_read_data(self):
         self.pose_list = []
         for key, value in self.pose_dict.items():
-            self.pose_list.append(LabeledPose(key, Pose2D(value['pose'][0], value['pose'][1], value['pose'][2]), ptz(value['ptz_pose'][0], value['ptz_pose'][1], value['ptz_pose'][2], False)))
+            self.pose_list.append(LabeledPose(key, Pose2D(value['pose'][0], value['pose'][1], value['pose'][2]), ptz(value['ptz_pose'][0], value['ptz_pose'][1], value['ptz_pose'][2], False, "position")))
 
         if self.publish_markers:
             self.update_marker_array()

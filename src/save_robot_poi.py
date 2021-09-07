@@ -85,7 +85,7 @@ class SaveRobotPOI:
     def set_poi_cb(self, req):
     
         now = datetime.now()
-        date_name = now.strftime("%d-%m-%Y-%H:%M:%S")
+        date_name = now.strftime("%d_%m_%Y_%H_%M_%S")
         rospy.loginfo("poi_manager/save_robot_poi::set_poi_cb: New point named as " + date_name)
 
         name = date_name

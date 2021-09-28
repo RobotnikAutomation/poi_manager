@@ -282,13 +282,11 @@ class PointPathManager(InteractiveMarkerServer):
 
     self.robot_environment = ""
 
-    self.rosSetup()
-
     # Menu handler to create a menu
     self.initMenuHandlers()
 
-    #rospy.sleep(2)
-    #self.loadPOIs(None)
+    self.rosSetup()
+
 
   def initMenuHandlers(self):
     self.menu_handler = MenuHandler()

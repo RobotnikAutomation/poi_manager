@@ -234,7 +234,7 @@ class PoiManager(RComponent):
     def get_poi_cb(self, req):
         response = GetPOIResponse()
         if( req.environment == ""):
-            response.success = True
+            response.success = False
             response.message = "The environment is empty, this enviroment has 0 points"
             return response
         if len(self.pose_list) > 0:

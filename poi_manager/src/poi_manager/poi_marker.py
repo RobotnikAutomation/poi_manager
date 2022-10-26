@@ -44,10 +44,10 @@ from std_srvs.srv import Empty, Trigger, SetBool,SetBoolRequest,SetBoolResponse
 from poi_manager_msgs.srv import *
 from poi_manager_msgs.msg import *
 from std_msgs.msg import Header
-from poi_manager_msgs.msg import PoiState
 from robotnik_msgs.msg import State
 from robot_local_control_msgs.msg import LocalizationStatus
 from tf import TransformListener
+from sensor_msgs.msg import JointState
 
 
 #frame_id = 'map'
@@ -275,12 +275,12 @@ class PointPathManager(InteractiveMarkerServer):
     self.load_pois_service_name = args['load_pois_service_name']
     self.add_poi_service_name = args['add_poi_service_name']
     self.delete_poi_service_name = args['delete_poi_service_name']
-    self.save_pois_service_name = args['save_pois_service_name']
     self.delete_all_pois_service_name = args['delete_all_pois_service_name']
     self.rlc_localization_status_topic_name = args['rlc_localization_status_topic_name']
     self.node_name = rospy.get_name()
 
     self.robot_environment = ""
+    self.joint_states_dict = {}
 
     # Menu handler to create a menu
     self.initMenuHandlers()
@@ -389,9 +389,9 @@ class PointPathManager(InteractiveMarkerServer):
     self.counter_points = self.counter_points + 1
     return new_point
 
-  def save_poi_service(self,name,frame,pose):
+  def save_poi_service(self, name, frame, pose, joints = {}):
     if self.robot_environment == "":
-      return False," No environment selected"
+      return False, "No environment selected"
     try:
       resp = rospy.ServiceProxy(self.add_poi_service_name , AddPOI)
       p = LabeledPose()
@@ -399,6 +399,9 @@ class PointPathManager(InteractiveMarkerServer):
       p.environment = self.robot_environment
       p.frame_id = frame
       p.pose = pose
+      p.joints = []
+      for i in joints:
+        p.joints.append(PoiJointState(name = i, position = joints[i]))
 
       res = resp(p)
 
@@ -406,6 +409,7 @@ class PointPathManager(InteractiveMarkerServer):
         return True,res.message
       else:
         return False,res.message
+
     except rospy.ServiceException as e:
       msg = "Service call to %s failed: %s" % (self.add_poi_service_name,e)
       rospy.logerr('%s::save_poi_service: %s',rospy.get_name(), msg)
@@ -417,7 +421,7 @@ class PointPathManager(InteractiveMarkerServer):
     new_point = self.newPOIfromPose(feedback.pose, 'p%d'%(self.counter_points), is_editable=False)
 
 
-    rospy.loginfo("%s::addPOI: %s, environment: %s" ,self.node_name, self.add_poi_service_name, self.robot_environment)
+    rospy.loginfo("%s::createNewPOI: %s, environment: %s" ,self.node_name, self.add_poi_service_name, self.robot_environment)
 
     success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose)
     if success == False:
@@ -429,7 +433,7 @@ class PointPathManager(InteractiveMarkerServer):
     current_pose = self.getCurrentPose()
     robot_pose = Pose()
     if(not current_pose[0]):
-      rospy.logerror("%s::addPOI: %s ,environment: Error: %s" ,self.node_name, self.add_poi_service_name, current_pose[1])
+      rospy.logerror("%s::createNewPOIFromRobotPose: %s ,environment: Error: %s" ,self.node_name, self.add_poi_service_name, current_pose[1])
       return
     robot_pose.position.x = current_pose[2][0]
     robot_pose.position.y = current_pose[2][1]
@@ -439,9 +443,9 @@ class PointPathManager(InteractiveMarkerServer):
     robot_pose.orientation.z = current_pose[3][2]
     robot_pose.orientation.w = current_pose[3][3]
     new_point = self.newPOIfromPose(robot_pose, 'p%d'%(self.counter_points), is_editable=False)
-    rospy.loginfo("%s::addPOI: %s ,environment: %s" ,self.node_name, self.add_poi_service_name,self.robot_environment)
+    rospy.loginfo("%s::createNewPOIFromRobotPose: %s ,environment: %s" ,self.node_name, self.add_poi_service_name,self.robot_environment)
 
-    success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose)
+    success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose, self.joint_states_dict)
 
     #TODO: error feedback
     self.applyChanges()
@@ -456,7 +460,7 @@ class PointPathManager(InteractiveMarkerServer):
       resp = rospy.ServiceProxy(self.load_pois_service_name, ReadPOIs)
       poi_list = resp()
       rospy.loginfo(str(poi_list))
-    except rospy.ServiceException, e:
+    except rospy.ServiceException as e:
       rospy.logerr("%s::loadPOIs: Service call failed: %s",rospy.get_name(),e)
       return
     #create	the POis
@@ -601,6 +605,13 @@ class PointPathManager(InteractiveMarkerServer):
             if resp[0] == False:
               rospy.logerr("%s::rlcLocalizationStatusCb: %s", self.node_name, resp[1])
 
+
+  def jointStatesCb(self, msg):
+    #self.joint_states = msg
+    for i in range(len(msg.name)):
+      self.joint_states_dict[msg.name[i]] = msg.position[i]
+    
+
   def saveRobotPoseServiceCb(self, msg):
     current_pose = self.getCurrentPose()
     robot_pose = Pose()
@@ -618,7 +629,7 @@ class PointPathManager(InteractiveMarkerServer):
     rospy.loginfo('%s::saveRobotPoseServiceCb',rospy.get_name())
     new_point = self.newPOIfromPose(robot_pose, 'p%d'%(self.counter_points), is_editable=False)
 
-    success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose)
+    success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose, self.joint_states_dict)
 
     self.applyChanges()
 
@@ -634,7 +645,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.state_publisher = rospy.Publisher('~state', PoiState, queue_size=10)
     # subscribers
     self.rlc_localization_status_subscriber = rospy.Subscriber(self.rlc_localization_status_topic_name, LocalizationStatus, self.rlcLocalizationStatusCb)
-    
+    self.joint_state_subscriber = rospy.Subscriber('joint_states', JointState, self.jointStatesCb)
     # service servers
     self.load_poi_tag_service_server = rospy.Service('~load_pois', SetBool, self.serviceLoadPOIs)
     self.delete_all_poi_tag_service_server = rospy.Service('~delete_all_pois', SetBool, self.serviceDeleteAllPOIs)
@@ -930,7 +941,6 @@ if __name__=="__main__":
 	  'load_pois_service_name': 'poi_manager/get_poi_list',
     'add_poi_service_name': 'poi_manager/add_poi',
     'delete_poi_service_name': 'poi_manager/delete_poi',
-	  'save_pois_service_name': 'poi_manager/update_pois',
     'delete_all_pois_service_name': 'poi_manager/delete_environment',
     'rlc_localization_status_topic_name' : 'robot_local_control/LocalizationComponent/status'
 	}

@@ -3,3 +3,4 @@ string environment
 string params
 string frame_id
 geometry_msgs/Pose pose
+PoiJointState[] joints

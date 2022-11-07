@@ -119,6 +119,10 @@ class PoiManager(RComponent):
                                         labeled_point.pose.orientation.y=value_params[1]
                                         labeled_point.pose.orientation.z=value_params[2]
                                         labeled_point.pose.orientation.w=value_params[3]
+                                    if (point_params_key=='joints'):
+                                        joints_dict = value_params
+                                        for i in joints_dict:
+                                            labeled_point.joints.append(PoiJointState(name = i, position = joints_dict[i]))                                    
 
                                 self.pose_list.append(labeled_point)
                         else:
@@ -416,6 +420,9 @@ class PoiManager(RComponent):
         try:
             self.try_create_env(self.pose_dict,req.p.environment)
             self.try_create_point(self.pose_dict,req.p.environment,req.p.name)
+            joints_dict = {}
+            for j in req.p.joints:
+                joints_dict[j.name] = j.position
             point  = {'position':[float(req.p.pose.position.x),
                                   float(req.p.pose.position.y),
                                   float(req.p.pose.position.z)],
@@ -424,7 +431,8 @@ class PoiManager(RComponent):
                                     float(req.p.pose.orientation.z),
                                     float(req.p.pose.orientation.w)],
                     'frame_id':req.p.frame_id,
-                    'params':req.p.params}
+                    'params':req.p.params,
+                    'joints':joints_dict}
             self.pose_dict['environments'][req.p.environment]['points'][req.p.name] = point
 
             self.pose_list.append(req.p)

@@ -44,10 +44,10 @@ from std_srvs.srv import Empty, Trigger, SetBool,SetBoolRequest,SetBoolResponse
 from poi_manager_msgs.srv import *
 from poi_manager_msgs.msg import *
 from std_msgs.msg import Header
-from poi_manager_msgs.msg import PoiState
 from robotnik_msgs.msg import State
 from robot_local_control_msgs.msg import LocalizationStatus
 from tf import TransformListener
+from sensor_msgs.msg import JointState
 
 
 #frame_id = 'map'
@@ -191,48 +191,48 @@ class PointPath(InteractiveMarker):
             control.orientation.z = 0
         elif is_editable:
     		#arrow color
-    		self.marker.color.r = 0.8
-    		self.marker.color.g = 0.8
-    		self.marker.color.b = 0.0
-    		self.marker.color.a = 0.75
-    		self.marker.scale.x = 1
-    		self.marker.scale.y = 0.2
-    		self.marker.scale.z = 0.2
-    		#interactive marker move_plane
-    		self.marker_move_control = InteractiveMarkerControl()
-    		self.marker_move_control.always_visible = True
-    		self.marker_move_control.orientation.w = 1
-    		self.marker_move_control.orientation.x = 0
-    		self.marker_move_control.orientation.y = 1
-    		self.marker_move_control.orientation.z = 0
-    		self.marker_move_control.name = "move_plane"
-    		self.marker_move_control.markers.append( self.marker )
-    		self.marker_move_control.interaction_mode = InteractiveMarkerControl.MOVE_PLANE
+          self.marker.color.r = 0.8
+          self.marker.color.g = 0.8
+          self.marker.color.b = 0.0
+          self.marker.color.a = 0.75
+          self.marker.scale.x = 1
+          self.marker.scale.y = 0.2
+          self.marker.scale.z = 0.2
+          #interactive marker move_plane
+          self.marker_move_control = InteractiveMarkerControl()
+          self.marker_move_control.always_visible = True
+          self.marker_move_control.orientation.w = 1
+          self.marker_move_control.orientation.x = 0
+          self.marker_move_control.orientation.y = 1
+          self.marker_move_control.orientation.z = 0
+          self.marker_move_control.name = "move_plane"
+          self.marker_move_control.markers.append( self.marker )
+          self.marker_move_control.interaction_mode = InteractiveMarkerControl.MOVE_PLANE
 
-    		self.controls.append( self.marker_move_control )
-    		#interactive marker rotate_z
-    		self.marker_rotate_control = InteractiveMarkerControl()
-    		self.marker_rotate_control.orientation.w = 1
-    		self.marker_rotate_control.orientation.x = 0
-    		self.marker_rotate_control.orientation.y = 1
-    		self.marker_rotate_control.orientation.z = 0
-    		self.marker_rotate_control.name = "rotate_z"
-    		self.marker_rotate_control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
+          self.controls.append( self.marker_move_control )
+          #interactive marker rotate_z
+          self.marker_rotate_control = InteractiveMarkerControl()
+          self.marker_rotate_control.orientation.w = 1
+          self.marker_rotate_control.orientation.x = 0
+          self.marker_rotate_control.orientation.y = 1
+          self.marker_rotate_control.orientation.z = 0
+          self.marker_rotate_control.name = "rotate_z"
+          self.marker_rotate_control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
 
-    		self.controls.append( self.marker_rotate_control )
+          self.controls.append( self.marker_rotate_control )
 
-    		#control of text marker
-    		control.interaction_mode = InteractiveMarkerControl.MOVE_PLANE
-    		control.orientation.w = 1
-    		control.orientation.x = 0
-    		control.orientation.y = 1
-    		control.orientation.z = 0
+          #control of text marker
+          control.interaction_mode = InteractiveMarkerControl.MOVE_PLANE
+          control.orientation.w = 1
+          control.orientation.x = 0
+          control.orientation.y = 1
+          control.orientation.z = 0
         else:
-    		self.marker.color.r = 0.0
-    		self.marker.color.g = 0.7
-    		self.marker.color.b = 0.0
-    		self.marker.color.a = 0.5
-    		control.interaction_mode = InteractiveMarkerControl.FIXED
+          self.marker.color.r = 0.0
+          self.marker.color.g = 0.7
+          self.marker.color.b = 0.0
+          self.marker.color.a = 0.5
+          control.interaction_mode = InteractiveMarkerControl.FIXED
 
         self.marker_control = InteractiveMarkerControl()
         self.marker_control.name = 'menu'
@@ -275,12 +275,12 @@ class PointPathManager(InteractiveMarkerServer):
     self.load_pois_service_name = args['load_pois_service_name']
     self.add_poi_service_name = args['add_poi_service_name']
     self.delete_poi_service_name = args['delete_poi_service_name']
-    self.save_pois_service_name = args['save_pois_service_name']
     self.delete_all_pois_service_name = args['delete_all_pois_service_name']
     self.rlc_localization_status_topic_name = args['rlc_localization_status_topic_name']
     self.node_name = rospy.get_name()
 
     self.robot_environment = ""
+    self.joint_states_dict = {}
 
     # Menu handler to create a menu
     self.initMenuHandlers()
@@ -309,8 +309,6 @@ class PointPathManager(InteractiveMarkerServer):
 
     self.h_fourth_entry = self.menu_handler.insert( "ALL POIs" )
     entry = self.menu_handler.insert( "Delete", parent=self.h_fourth_entry, callback=self.deleteAllPOIs )
-    # entry = self.menu_handler.insert( "Load from yaml", parent=self.h_fourth_entry, callback=self.loadPOIs )
-    # entry = self.menu_handler.insert( "Save to yaml", parent=self.h_fourth_entry, callback=self.savePOIs )
 
     # Creates the first point (manager)
     self.initial_point = PointPath('POIManager', 'POIManager', frame_id = self.frame_id, is_manager=True)
@@ -391,9 +389,9 @@ class PointPathManager(InteractiveMarkerServer):
     self.counter_points = self.counter_points + 1
     return new_point
 
-  def save_poi_service(self,name,frame,pose):
+  def save_poi_service(self, name, frame, pose, joints = {}):
     if self.robot_environment == "":
-      return False," No environment selected"
+      return False, "No environment selected"
     try:
       resp = rospy.ServiceProxy(self.add_poi_service_name , AddPOI)
       p = LabeledPose()
@@ -401,6 +399,9 @@ class PointPathManager(InteractiveMarkerServer):
       p.environment = self.robot_environment
       p.frame_id = frame
       p.pose = pose
+      p.joints = []
+      for i in joints:
+        p.joints.append(PoiJointState(name = i, position = joints[i]))
 
       res = resp(p)
 
@@ -408,7 +409,8 @@ class PointPathManager(InteractiveMarkerServer):
         return True,res.message
       else:
         return False,res.message
-    except rospy.ServiceException, e:
+
+    except rospy.ServiceException as e:
       msg = "Service call to %s failed: %s" % (self.add_poi_service_name,e)
       rospy.logerr('%s::save_poi_service: %s',rospy.get_name(), msg)
       return False,msg
@@ -419,7 +421,7 @@ class PointPathManager(InteractiveMarkerServer):
     new_point = self.newPOIfromPose(feedback.pose, 'p%d'%(self.counter_points), is_editable=False)
 
 
-    rospy.loginfo("%s::addPOI: %s, environment: %s" ,self.node_name, self.add_poi_service_name, self.robot_environment)
+    rospy.loginfo("%s::createNewPOI: %s, environment: %s" ,self.node_name, self.add_poi_service_name, self.robot_environment)
 
     success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose)
     if success == False:
@@ -431,7 +433,7 @@ class PointPathManager(InteractiveMarkerServer):
     current_pose = self.getCurrentPose()
     robot_pose = Pose()
     if(not current_pose[0]):
-      rospy.logerror("%s::addPOI: %s ,environment: Error: %s" ,self.node_name, self.add_poi_service_name, current_pose[1])
+      rospy.logerror("%s::createNewPOIFromRobotPose: %s ,environment: Error: %s" ,self.node_name, self.add_poi_service_name, current_pose[1])
       return
     robot_pose.position.x = current_pose[2][0]
     robot_pose.position.y = current_pose[2][1]
@@ -441,9 +443,9 @@ class PointPathManager(InteractiveMarkerServer):
     robot_pose.orientation.z = current_pose[3][2]
     robot_pose.orientation.w = current_pose[3][3]
     new_point = self.newPOIfromPose(robot_pose, 'p%d'%(self.counter_points), is_editable=False)
-    rospy.loginfo("%s::addPOI: %s ,environment: %s" ,self.node_name, self.add_poi_service_name,self.robot_environment)
+    rospy.loginfo("%s::createNewPOIFromRobotPose: %s ,environment: %s" ,self.node_name, self.add_poi_service_name,self.robot_environment)
 
-    success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose)
+    success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose, self.joint_states_dict)
 
     #TODO: error feedback
     self.applyChanges()
@@ -458,12 +460,12 @@ class PointPathManager(InteractiveMarkerServer):
       resp = rospy.ServiceProxy(self.load_pois_service_name, ReadPOIs)
       poi_list = resp()
       rospy.loginfo(str(poi_list))
-    except rospy.ServiceException, e:
+    except rospy.ServiceException as e:
       rospy.logerr("%s::loadPOIs: Service call failed: %s",rospy.get_name(),e)
       return
     #create	the POis
     for elem in poi_list.pose_list:
-      self.newPOIfromPose2D(elem, elem.label, frame_id)
+      self.newPOIfromPose2D(elem, elem.label, self.frame_id)
     self.applyChanges()
 
     rospy.loginfo("%s::loadPOIs: After load there are %d pois", rospy.get_name(), len(self.list_of_points))
@@ -492,37 +494,6 @@ class PointPathManager(InteractiveMarkerServer):
       self.applyChanges()
       #~ #call update_pois service
       #~ self.update_pois()
-
-  #save POIs to yaml file
-  def savePOIs(self, feedback):
-    rospy.loginfo("%s::savePOIs: saving %d points", rospy.get_name(), len(self.list_of_points))
-    ##if this marker is editable, make it no-editable
-    if(self.menu_handler.getCheckState( 2 ) == MenuHandler.CHECKED): #2 is the menu_entry_id of Edit
-      self.menu_handler.setCheckState(2, MenuHandler.UNCHECKED )
-      #delete the editable POI
-      for i in self.list_of_points:
-        if i.name==feedback.marker_name:
-          self.deletePOI(feedback)
-          print("found!")
-          break
-      #create Noeditable POI
-      self.newPOIfromPose(i.pose, i.name, is_editable=False)
-      self.applyChanges()
-
-    try:
-      update_pois = rospy.ServiceProxy(self.save_pois_service_name, UpdatePOIs)
-    except rospy.ServiceException, e:
-      rospy.logerr("%s::savePOIs: Service call failed: %s",rospy.get_name(),e)
-      return
-
-    newPOIs = []
-    for i in self.list_of_points:
-      pose = Pose2D(i.pose.position.x, i.pose.position.y, 2*math.asin(i.pose.orientation.z))
-      newPOIs.append(LabeledPose(i.name,pose))
-    try:
-      resp = update_pois(newPOIs)
-    except rospy.ServiceException as exc:
-      rospy.logerr("%s::savePOIs: Error: %s", rospy.get_name(), str(exc))
 
   def editPOI(self, feedback):
     rospy.loginfo("%s::editPOI: %s menu:%s"%(rospy.get_name(),feedback.marker_name,feedback.menu_entry_id))
@@ -634,6 +605,13 @@ class PointPathManager(InteractiveMarkerServer):
             if resp[0] == False:
               rospy.logerr("%s::rlcLocalizationStatusCb: %s", self.node_name, resp[1])
 
+
+  def jointStatesCb(self, msg):
+    #self.joint_states = msg
+    for i in range(len(msg.name)):
+      self.joint_states_dict[msg.name[i]] = msg.position[i]
+    
+
   def saveRobotPoseServiceCb(self, msg):
     current_pose = self.getCurrentPose()
     robot_pose = Pose()
@@ -651,7 +629,7 @@ class PointPathManager(InteractiveMarkerServer):
     rospy.loginfo('%s::saveRobotPoseServiceCb',rospy.get_name())
     new_point = self.newPOIfromPose(robot_pose, 'p%d'%(self.counter_points), is_editable=False)
 
-    success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose)
+    success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose, self.joint_states_dict)
 
     self.applyChanges()
 
@@ -667,7 +645,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.state_publisher = rospy.Publisher('~state', PoiState, queue_size=10)
     # subscribers
     self.rlc_localization_status_subscriber = rospy.Subscriber(self.rlc_localization_status_topic_name, LocalizationStatus, self.rlcLocalizationStatusCb)
-
+    self.joint_state_subscriber = rospy.Subscriber('joint_states', JointState, self.jointStatesCb)
     # service servers
     self.load_poi_tag_service_server = rospy.Service('~load_pois', SetBool, self.serviceLoadPOIs)
     self.delete_all_poi_tag_service_server = rospy.Service('~delete_all_pois', SetBool, self.serviceDeleteAllPOIs)
@@ -676,8 +654,6 @@ class PointPathManager(InteractiveMarkerServer):
 
     self.service_get_current_pose_service = rospy.Service('~delete_poi', DeletePOI, self.deletePoiCB)
 
-    #self.add_pois_2d_tag_service_server = rospy.Service('~add_pois_2d', UpdatePOIs, self.serviceAddPOIsfromPose2D)
-    #self.init_pose_2d_tag_service_server = rospy.Service('~inti_pose_2d', UpdatePOIs, self.ServiceInitialPose2D)
     self.stop_tag_service_server = rospy.Service('~stop_goto', SetBool, self.serviceStop)
     self.service_server = rospy.Service('~save_robot_pose', Trigger, self.saveRobotPoseServiceCb)
 
@@ -703,8 +679,6 @@ class PointPathManager(InteractiveMarkerServer):
     if self._state.action == PoiState.GOTO:
       if self.planner_client.getState() != GoalStatus.ACTIVE:
         self.switchToAction(PoiState.IDLE)
-
-
 
     return
 
@@ -732,7 +706,6 @@ class PointPathManager(InteractiveMarkerServer):
       rospy.loginfo('%s::switchToAction: %s',self.node_name, self._state.action)
 
     return
-
 
   def stateToString(self, state):
     '''
@@ -777,8 +750,6 @@ class PointPathManager(InteractiveMarkerServer):
         resp.pose.orientation.w = current_pose[3][3]
     return resp
 
-
-
   def getCurrentPose(self):
 
     try:
@@ -789,8 +760,6 @@ class PointPathManager(InteractiveMarkerServer):
         return True, ("Transform between " + self.base_frame_id + " -> " + self.frame_id), position, quaternion
     except Exception as e:
         return False, ("Error to transform between " + self.base_frame_id + " -> " + self.frame_id + " : " + str(e)), None, None
-
-
 
   def goToTagserviceCb(self, req):
     '''
@@ -845,7 +814,7 @@ class PointPathManager(InteractiveMarkerServer):
         return True,res.message
       else:
         return False,res.message
-    except rospy.ServiceException, e:
+    except rospy.ServiceException as e:
       msg = "%s::DeleteEnvironment: Service call failed: %s" % (rospy.get_name(),e)
       rospy.logerr(msg)
       return False,msg
@@ -876,7 +845,7 @@ class PointPathManager(InteractiveMarkerServer):
         return True,res.message
       else:
         return False,res.message
-    except rospy.ServiceException, e:
+    except rospy.ServiceException as e:
       msg = "%s::DeletePoi: Service call failed: %s" % (rospy.get_name(),e)
       rospy.logerr(msg)
       return False,msg
@@ -913,7 +882,7 @@ class PointPathManager(InteractiveMarkerServer):
           # call read_pois service
           try:
             rospy.wait_for_service(self.load_pois_service_name , timeout = 2)
-          except rospy.ROSException, e:
+          except rospy.ROSException as e:
             rospy.logerr("%s::serviceLoadPOIs: %s", self.node_name,e)
             return False,'Exception'
           try:
@@ -925,7 +894,7 @@ class PointPathManager(InteractiveMarkerServer):
             else:
               #self.serviceDeleteAllPOIs(req)
               return False,res.message
-          except rospy.ServiceException, e:
+          except rospy.ServiceException as e:
             rospy.logerr("%s::serviceLoadPOIs: Service call failed: %s",self.node_name,e)
             return False,'Exception'
 
@@ -943,67 +912,6 @@ class PointPathManager(InteractiveMarkerServer):
       return True,'OK'
     else:
       return False,'Input argument was set as false'
-
-  def serviceSavePOIs(self, req):
-    if(req.data == True):
-      rospy.loginfo("%s::savePOIs", self.node_name)
-      ##if this marker is editable, make it no-editable
-      if(self.menu_handler.getCheckState( 2 ) == MenuHandler.CHECKED): #2 is the menu_entry_id of Edit
-        self.menu_handler.setCheckState(2, MenuHandler.UNCHECKED )
-        #create Noeditable POI
-        self.newPOIfromPose(i, i.name, is_editable=False)
-        self.applyChanges()
-      ##call service update_pois
-      try:
-        rospy.wait_for_service(self.save_pois_service_name, timeout = 2)
-      except rospy.ROSException, e:
-        rospy.logerr("%s::savePOIs: %s", self.node_name,e)
-        return False,'Exception'
-
-      try:
-        update_pois = rospy.ServiceProxy(self.save_pois_service_name, UpdatePOIs)
-      except rospy.ServiceException, e:
-        rospy.logerr("%s::savePOIs: Service call failed: %s",self.node_name,e)
-        return False,'Exception'
-
-      newPOIs = []
-      for i in self.list_of_points:
-        pose = Pose2D(i.pose.position.x, i.pose.position.y, 2*math.asin(i.pose.orientation.z))
-        newPOIs.append(LabeledPose(i.name,pose))
-      try:
-        resp = update_pois(newPOIs)
-      except rospy.ServiceException as exc:
-        rospy.logerr("%s::savePOIs:: Service did not process request: %s",self.node_name,str(exc))
-        return False,'Exception'
-      return True,'OK'
-    else:
-      return False,'OK'
-
-
-  def serviceAddPOIsfromPose2D(self, req):
-    for poi in req.pose_list:
-      name = poi.label
-      new_point = PointPath(name, name, frame_id = self.frame_id)
-      new_point.pose.position.x = poi.pose.x
-      new_point.pose.position.y = poi.pose.y
-      new_point.pose.orientation.x = 0
-      new_point.pose.orientation.y = 0
-      new_point.pose.orientation.z = math.sin(poi.pose.theta*0.5)
-      new_point.pose.orientation.w = math.cos(poi.pose.theta*0.5)
-      self.list_of_points.append(new_point)
-      self.insert(new_point, new_point.processFeedback)
-      self.menu_handler.setCheckState( self.entry_edit, MenuHandler.UNCHECKED )
-      self.menu_handler.setVisible(self.entry_new, False)
-      self.menu_handler.setVisible(self.entry_edit, True)
-      self.menu_handler.setVisible(self.entry_delete, True)
-      self.menu_handler.setVisible(self.h_fourth_entry, False)
-      self.menu_handler.apply( self, new_point.name )
-      self.counter_points = self.counter_points + 1
-    load = SetBool()
-    load.data = True
-    self.serviceSavePOIs (load)
-    self.serviceLoadPOIs (load)
-    return Empty()
 
   def ServiceInitialPose2D(self, req):
     poi = req.pose_list[0]
@@ -1026,21 +934,18 @@ if __name__=="__main__":
 	_name = rospy.get_name().replace('/','')
 
 	arg_defaults = {
-      'base_frame_id': 'robot_base_footprint',
+    'base_frame_id': 'robot_base_footprint',
 	  'frame_id': 'robot_map',
 	  'goto_planner': 'mb_avoidance/move_base',
 	  'init_pose_topic_name': 'initialpose',
 	  'load_pois_service_name': 'poi_manager/get_poi_list',
-      'add_poi_service_name': 'poi_manager/add_poi',
-      'delete_poi_service_name': 'poi_manager/delete_poi',
-	  'save_pois_service_name': 'poi_manager/update_pois',
-      'delete_all_pois_service_name': 'poi_manager/delete_environment',
-      'rlc_localization_status_topic_name' : 'robot_local_control/LocalizationComponent/status'
+    'add_poi_service_name': 'poi_manager/add_poi',
+    'delete_poi_service_name': 'poi_manager/delete_poi',
+    'delete_all_pois_service_name': 'poi_manager/delete_environment',
+    'rlc_localization_status_topic_name' : 'robot_local_control/LocalizationComponent/status'
 	}
 
 	args = {}
-
-
 
 	for name in arg_defaults:
 		try:
@@ -1049,7 +954,7 @@ if __name__=="__main__":
 			else:
 				args[name] = arg_defaults[name]
 			#print name
-		except rospy.ROSException, e:
+		except rospy.ROSException as e:
 			rospy.logerror('%s: %s'%(e, _name))
 	#frame_id = args['frame_id']
 	#TODO: the object should get the args dict and set them in the init, not this way

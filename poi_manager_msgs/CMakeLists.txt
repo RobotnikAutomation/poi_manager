@@ -8,6 +8,7 @@ add_message_files(
   FILES
   LabeledPose.msg
   PoiState.msg
+  PoiJointState.msg
 )
 
 ## Generate services in the 'srv' folder

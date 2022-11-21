@@ -365,9 +365,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.menu_handler.apply( self, self.initial_point.name )
     self.applyChanges()
 
-    req = SetBoolRequest()
-    req.data=True
-    resp = self.serviceLoadPOIs(req)
+    resp = self.loadPoisFromServer()
     if resp[0] == False:
       rospy.logerr("%s::enableManager: %s", self.node_name, resp[1])
 
@@ -491,26 +489,6 @@ class PointPathManager(InteractiveMarkerServer):
     #TODO: error feedback
     self.applyChanges()
 
-  ## @brief Callback called to reload from yaml
-  def loadPOIs(self, feedback):
-    rospy.loginfo("%s::loadPOIs: Before load there are %d pois", rospy.get_name(), len(self.list_of_points))
-    # Deletes all the loaded points
-    if len(self.list_of_points) >= 0:
-      self.deleteAllPOIs()
-    try:
-      resp = rospy.ServiceProxy(self.load_pois_service_name, ReadPOIs)
-      poi_list = resp()
-      rospy.loginfo(str(poi_list))
-    except rospy.ServiceException as e:
-      rospy.logerr("%s::loadPOIs: Service call failed: %s",rospy.get_name(),e)
-      return
-    #create	the POis
-    for elem in poi_list.pose_list:
-      self.newPOIfromPose2D(elem, elem.label, self.frame_id)
-    self.applyChanges()
-
-    rospy.loginfo("%s::loadPOIs: After load there are %d pois", rospy.get_name(), len(self.list_of_points))
-    self.counter_points = self.counter_points + 1
 
   ## @brief Callback called to delete all
   def deleteAllPOIs(self):
@@ -657,7 +635,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.rlc_localization_status_subscriber = rospy.Subscriber(self.rlc_localization_status_topic_name, LocalizationStatus, self.rlcLocalizationStatusCb)
     self.joint_state_subscriber = rospy.Subscriber('joint_states', JointState, self.jointStatesCb)
     # service servers
-    # self.load_poi_tag_service_server = rospy.Service('~load_pois', SetBool, self.serviceLoadPOIs)
+    # self.load_poi_tag_service_server = rospy.Service('~load_pois', SetBool, self.loadPoisFromServer)
     self.delete_all_poi_tag_service_server = rospy.Service('~delete_all_pois', SetBool, self.serviceDeleteAllPOIs)
 
     self.service_get_current_pose_service = rospy.Service('~get_current_pose', GetPoseTrigger, self.getCurrentPoseCB)
@@ -905,10 +883,9 @@ class PointPathManager(InteractiveMarkerServer):
   # @brief Load the pois. If req.data == true it try charge the pois and return OK or not else return false a msg.
   # @param req: Srv type SetBool, request- bool
   # @return Srv type SetBool, response- bool sucess, message: string
-  def serviceLoadPOIs(self, req):
-    if(req.data == True):
-      rospy.loginfo("%s::serviceLoadPOIs: there were %d pois before loading",self.node_name,len(self.list_of_points))
-      rospy.loginfo("%s::serviceLoadPOIs: %s, environment: %s" ,self.node_name, self.load_pois_service_name,self.robot_environment)
+  def loadPoisFromServer(self):
+      rospy.loginfo("%s::loadPoisFromServer: there were %d pois before loading",self.node_name,len(self.list_of_points))
+      rospy.loginfo("%s::loadPoisFromServer: %s, environment: %s" ,self.node_name, self.load_pois_service_name,self.robot_environment)
       poi_list=[]
 
       if self.robot_environment != '':
@@ -916,7 +893,7 @@ class PointPathManager(InteractiveMarkerServer):
           try:
             rospy.wait_for_service(self.load_pois_service_name , timeout = 2)
           except rospy.ROSException as e:
-            rospy.logerr("%s::serviceLoadPOIs: %s", self.node_name,e)
+            rospy.logerr("%s::loadPoisFromServer: %s", self.node_name,e)
             return False,'Exception'
           try:
             resp = rospy.ServiceProxy(self.load_pois_service_name , GetPOIs)
@@ -928,25 +905,19 @@ class PointPathManager(InteractiveMarkerServer):
               #self.serviceDeleteAllPOIs(req)
               return False,res.message
           except rospy.ServiceException as e:
-            rospy.logerr("%s::serviceLoadPOIs: Service call failed: %s",self.node_name,e)
+            rospy.logerr("%s::loadPoisFromServer: Service call failed: %s",self.node_name,e)
             return False,'Exception'
 
       # Deletes all the visualized points
       self.deleteAllPOIs()
-      '''for i in range(0,len(self.list_of_points)):
-        p=self.list_of_points.pop()
-        self.erase(p.name)
-        self.counter_points = self.counter_points - 1
-        self.applyChanges()
-      '''
+
       #create	the POis
       for elem in poi_list:
         self.newPOIfromPose3D(elem.pose, elem.name, elem.frame_id)
       self.applyChanges()
-      rospy.loginfo("%s::serviceLoadPOIs: there are %d pois after loading",self.node_name,len(self.list_of_points))
+      rospy.loginfo("%s::loadPoisFromServer: there are %d pois after loading",self.node_name,len(self.list_of_points))
       return True,'OK'
-    else:
-      return False,'Input argument was set as false'
+
 
   def ServiceInitialPose2D(self, req):
     poi = req.pose_list[0]

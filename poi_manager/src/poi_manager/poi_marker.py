@@ -48,9 +48,11 @@ from robotnik_msgs.msg import State
 from robot_local_control_msgs.msg import LocalizationStatus
 from tf import TransformListener
 from sensor_msgs.msg import JointState
+from std_msgs.msg import ColorRGBA 
 
 
 #frame_id = 'map'
+
 
 # Client based on ActionServer to send goals to the purepursuit node
 class MoveBaseClient():
@@ -126,7 +128,7 @@ class InitPoseClient():
 
 class PointPath(InteractiveMarker):
 
-    def __init__(self, name, description, frame_id, is_manager = False, is_editable = False):
+    def __init__(self, name, description, frame_id, is_manager = False, is_editable = False, color = ColorRGBA(1,1,1,1)):
         InteractiveMarker.__init__(self)
 
         marker_scale_x = rospy.get_param('~marker_scale_x', 0.5)
@@ -144,6 +146,7 @@ class PointPath(InteractiveMarker):
         self.marker.scale.y = marker_scale_y
         self.marker.scale.z = marker_scale_z
         #self.marker.pose.position.z = 0.05
+        self.color = color
 
         ##Text of markers
         control = InteractiveMarkerControl()
@@ -153,10 +156,11 @@ class PointPath(InteractiveMarker):
 
         if is_manager:
             #arrow color
-            self.marker.color.r = 0.8
-            self.marker.color.g = 0.0
-            self.marker.color.b = 0.0
-            self.marker.color.a = 0.5
+            #self.marker.color.r = 0.8
+            #self.marker.color.g = 0.0
+            #self.marker.color.b = 0.0
+            #self.marker.color.a = 0.5
+            self.marker.color = self.color
             self.marker.scale.x = 1
             self.marker.scale.y = 0.2
             self.marker.scale.z = 0.2
@@ -228,10 +232,7 @@ class PointPath(InteractiveMarker):
           control.orientation.y = 1
           control.orientation.z = 0
         else:
-          self.marker.color.r = 0.0
-          self.marker.color.g = 0.7
-          self.marker.color.b = 0.0
-          self.marker.color.a = 0.5
+          self.marker.color = self.color
           control.interaction_mode = InteractiveMarkerControl.FIXED
 
         self.marker_control = InteractiveMarkerControl()
@@ -278,9 +279,18 @@ class PointPathManager(InteractiveMarkerServer):
     self.delete_all_pois_service_name = args['delete_all_pois_service_name']
     self.rlc_localization_status_topic_name = args['rlc_localization_status_topic_name']
     self.node_name = rospy.get_name()
+    self.initial_point = None
 
     self.robot_environment = ""
     self.joint_states_dict = {}
+    self.rlc_status_time = None
+    self.rlc_status_msg = None
+
+    self.marker_red_color = ColorRGBA(0.8,0,0, 1)
+    self.marker_black_color = ColorRGBA(0,0,0,0.5)
+    self.marker_green_color = ColorRGBA(0,0.7,0,0.5)
+
+    self.rlc_status_timeout = 2.0
 
     # Menu handler to create a menu
     self.initMenuHandlers()
@@ -290,38 +300,96 @@ class PointPathManager(InteractiveMarkerServer):
 
   def initMenuHandlers(self):
     self.menu_handler = MenuHandler()
-    h_first_entry = self.menu_handler.insert( "POI" )
-    self.entry_new = self.menu_handler.insert( "New", parent=h_first_entry, callback=self.createNewPOI )
-    self.entry_new_from_robot_pose = self.menu_handler.insert( "Current pose", parent=h_first_entry, callback=self.createNewPOIFromRobotPose )
-    self.entry_edit = self.menu_handler.insert( "Edit", parent=h_first_entry, callback=self.editPOI ) #IF this order changes the SAVE Callback must be changed
+    self.h_poi_entry = self.menu_handler.insert( "POI" )
+    self.entry_new = self.menu_handler.insert( "New", parent=self.h_poi_entry, callback=self.createNewPOI )
+    self.entry_new_from_robot_pose = self.menu_handler.insert( "Current pose", parent=self.h_poi_entry, callback=self.createNewPOIFromRobotPose )
+    self.entry_edit = self.menu_handler.insert( "Edit", parent=self.h_poi_entry, callback=self.editPOI ) #IF this order changes the SAVE Callback must be changed
     self.menu_handler.setCheckState( self.entry_edit, MenuHandler.UNCHECKED )
-    self.entry_delete = self.menu_handler.insert( "Delete", parent=h_first_entry, callback=self.deletePOI )
+    self.entry_delete = self.menu_handler.insert( "Delete", parent=self.h_poi_entry, callback=self.deletePOI )
 
-    h_second_entry = self.menu_handler.insert( "Navigation" )
-    entry = self.menu_handler.insert( "Go", parent=h_second_entry, callback=self.gotoPOI)	# Send the path from the first point to the last one
-    entry = self.menu_handler.insert( "Stop", parent=h_second_entry, callback=self.stop)	# Stops the current path
+    self.h_navigation_entry = self.menu_handler.insert( "Navigation" )
+    self.entry_go = self.menu_handler.insert( "Go", parent=self.h_navigation_entry, callback=self.gotoPOI)	# Send the path from the first point to the last one
+    self.entry_stop = self.menu_handler.insert( "Stop", parent=self.h_navigation_entry, callback=self.stop)	# Stops the current path
     self.h_loc_entry = self.menu_handler.insert( "Localization" )
-    entry = self.menu_handler.insert( "Init Pose", parent=self.h_loc_entry, callback=self.setInitialPose)
+    self.entry_init_pose = self.menu_handler.insert( "Init Pose", parent=self.h_loc_entry, callback=self.setInitialPose)
 
 
     # The covariance set whenever setting the global pose
     self._default_pose_covariance = [0.25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.06853891945200942]
 
-    self.h_fourth_entry = self.menu_handler.insert( "ALL POIs" )
-    entry = self.menu_handler.insert( "Delete", parent=self.h_fourth_entry, callback=self.deleteAllPOIs )
+    self.h_all_pois_entry = self.menu_handler.insert( "ALL POIs" )
+    self.entry_delete = self.menu_handler.insert( "Delete", parent=self.h_all_pois_entry, callback=self.deleteAllPOIs )
 
     # Creates the first point (manager)
-    self.initial_point = PointPath('POIManager', 'POIManager', frame_id = self.frame_id, is_manager=True)
+    self.disableManager()
+    
+
+  def disableManager(self):
+    '''
+      Method that disables the manager and remove all the pois
+    '''
+    if self.initial_point != None:
+      self.erase(self.initial_point.name)
+    self.initial_point = PointPath('POIManager', 'POIManager', frame_id = self.frame_id, is_manager=True, color = self.marker_black_color)
     self.insert(self.initial_point, self.initial_point.processFeedback)
 
     ##if is_manager menu Edit and remove have not any sense
-    self.menu_handler.setVisible(self.entry_edit, False)
-    self.menu_handler.setVisible(self.entry_delete, False)
+    self.menu_handler.setVisible(self.h_poi_entry, False)
+    self.menu_handler.setVisible(self.h_navigation_entry, False)
+    self.menu_handler.setVisible(self.h_loc_entry, True)
+    self.menu_handler.setVisible(self.h_all_pois_entry, False)
     self.menu_handler.apply( self, self.initial_point.name )
     self.applyChanges()
 
+    self.deleteAllPOIs()
+
+  def enableManager(self):
+    '''
+      Method that enables the manager and adds all the pois
+    '''
+    if self.initial_point != None:
+      self.erase(self.initial_point.name)
+    
+    self.initial_point = PointPath('POIManager', 'POIManager', frame_id = self.frame_id, is_manager=True, color = self.marker_red_color)
+    self.insert(self.initial_point, self.initial_point.processFeedback)
+    self.menu_handler.setVisible(self.h_poi_entry, True)
+    self.menu_handler.setVisible(self.h_navigation_entry, True)
+    self.menu_handler.setVisible(self.h_loc_entry, True)
+    self.menu_handler.setVisible(self.h_all_pois_entry, True)
+    self.menu_handler.setVisible(self.entry_new, True)
+    self.menu_handler.setVisible(self.entry_edit, False)
+    self.menu_handler.setVisible(self.entry_delete, False)
+    self.menu_handler.setVisible(self.entry_new_from_robot_pose, True)
+    self.menu_handler.apply( self, self.initial_point.name )
+    self.applyChanges()
+
+    req = SetBoolRequest()
+    req.data=True
+    resp = self.serviceLoadPOIs(req)
+    if resp[0] == False:
+      rospy.logerr("%s::enableManager: %s", self.node_name, resp[1])
+
+  def appendPOI(self, new_point, editable = False):
+    '''
+      @arg new_point as PointPath
+      @arg editable as bool
+    '''
+    self.list_of_points.append(new_point)
+    self.insert(new_point, new_point.processFeedback)
+    if editable == False:
+      self.menu_handler.setCheckState( self.entry_edit, MenuHandler.UNCHECKED )
+    self.menu_handler.setVisible(self.entry_new, False)
+    self.menu_handler.setVisible(self.entry_edit, True)
+    self.menu_handler.setVisible(self.entry_delete, True)
+    self.menu_handler.setVisible(self.h_all_pois_entry, False)
+    self.menu_handler.setVisible(self.entry_new_from_robot_pose, False)
+    self.menu_handler.apply( self, new_point.name )
+    self.counter_points = self.counter_points + 1
+    
+
+
   def newPOIfromPose2D(self, elem, name, is_editable=False):
-    new_point = PointPath(name, name, frame_id = self.frame_id)
+    new_point = PointPath(name, name, frame_id = self.frame_id, color = self.marker_green_color)
     new_point.pose.position.x = elem.pose.x
     new_point.pose.position.y = elem.pose.y
     new_point.pose.position.z = 0.2
@@ -329,41 +397,23 @@ class PointPathManager(InteractiveMarkerServer):
     new_point.pose.orientation.y = 0
     new_point.pose.orientation.z = math.sin(elem.pose.theta*0.5)
     new_point.pose.orientation.w = math.cos(elem.pose.theta*0.5)
-    self.list_of_points.append(new_point)
-    self.insert(new_point, new_point.processFeedback)
-    self.menu_handler.setCheckState( self.entry_edit, MenuHandler.UNCHECKED )
-    self.menu_handler.setVisible(self.entry_new, False)
-    self.menu_handler.setVisible(self.entry_edit, True)
-    self.menu_handler.setVisible(self.entry_delete, True)
-    self.menu_handler.setVisible(self.h_fourth_entry, False)
-    self.menu_handler.setVisible(self.entry_new_from_robot_pose, False)
-    self.menu_handler.apply( self, new_point.name )
-    self.counter_points = self.counter_points + 1
+    self.appendPOI(new_point=new_point, editable=is_editable)
+    
 
   def newPOIfromPose3D(self, elem, name, is_editable=False):
-    new_point = PointPath(name, name, frame_id = self.frame_id)
+    new_point = PointPath(name, name, frame_id = self.frame_id, color = self.marker_green_color)
     new_point.pose.position.x = elem.position.x
     new_point.pose.position.y = elem.position.y
-    #new_point.pose.position.z = elem.position.z
     new_point.pose.position.z = 0.2
     new_point.pose.orientation.x = elem.orientation.x
     new_point.pose.orientation.y = elem.orientation.y
     new_point.pose.orientation.z = elem.orientation.z
     new_point.pose.orientation.w = elem.orientation.w
-    self.list_of_points.append(new_point)
-    self.insert(new_point, new_point.processFeedback)
-    self.menu_handler.setCheckState( self.entry_edit, MenuHandler.UNCHECKED )
-    self.menu_handler.setVisible(self.entry_new, False)
-    self.menu_handler.setVisible(self.entry_edit, True)
-    self.menu_handler.setVisible(self.entry_delete, True)
-    self.menu_handler.setVisible(self.h_fourth_entry, False)
-    self.menu_handler.setVisible(self.entry_new_from_robot_pose, False)
-    self.menu_handler.apply( self, new_point.name )
-    self.counter_points = self.counter_points + 1
+    self.appendPOI(new_point=new_point, editable=is_editable)
 
 
   def newPOIfromPose(self, pose, name, is_editable=True):
-    new_point = PointPath(name, name, frame_id = self.frame_id, is_manager = False, is_editable = is_editable)
+    new_point = PointPath(name, name, frame_id = self.frame_id, is_manager = False, is_editable = is_editable, color = self.marker_green_color)
     rospy.loginfo("%s::newPOIfromPose: adding %s",rospy.get_name(),name)
     #rospy.loginfo("%s::newPOIfromPose: adding: %s",rospy.get_name(),str(pose))
     new_point.pose.position.x = pose.position.x
@@ -375,18 +425,7 @@ class PointPathManager(InteractiveMarkerServer):
     new_point.pose.orientation.z = pose.orientation.z
     new_point.pose.orientation.w = pose.orientation.w
     #rospy.loginfo("%s::newPOIfromPose: new point: %s",rospy.get_name(),str(new_point))
-
-    self.list_of_points.append(new_point)
-    self.insert(new_point, new_point.processFeedback)
-    if not is_editable:
-      self.menu_handler.setCheckState( self.entry_edit, MenuHandler.UNCHECKED )
-    self.menu_handler.setVisible(self.entry_new, False)
-    self.menu_handler.setVisible(self.entry_edit, True)
-    self.menu_handler.setVisible(self.entry_delete, True)
-    self.menu_handler.setVisible(self.h_fourth_entry, False)
-    self.menu_handler.setVisible(self.entry_new_from_robot_pose, False)
-    self.menu_handler.apply( self, new_point.name )
-    self.counter_points = self.counter_points + 1
+    self.appendPOI(new_point=new_point, editable=is_editable)
     return new_point
 
   def save_poi_service(self, name, frame, pose, joints = {}):
@@ -455,7 +494,7 @@ class PointPathManager(InteractiveMarkerServer):
     rospy.loginfo("%s::loadPOIs: Before load there are %d pois", rospy.get_name(), len(self.list_of_points))
     # Deletes all the loaded points
     if len(self.list_of_points) >= 0:
-      self.deleteAllPOIs(feedback)
+      self.deleteAllPOIs()
     try:
       resp = rospy.ServiceProxy(self.load_pois_service_name, ReadPOIs)
       poi_list = resp()
@@ -472,7 +511,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.counter_points = self.counter_points + 1
 
   ## @brief Callback called to delete all
-  def deleteAllPOIs(self, feedback):
+  def deleteAllPOIs(self):
     rospy.loginfo("%s::deleteAllPOIs %d",rospy.get_name(), len(self.list_of_points))
     for i in range(0,len(self.list_of_points)):
       p=self.list_of_points.pop()
@@ -571,39 +610,8 @@ class PointPathManager(InteractiveMarkerServer):
     return
 
   def rlcLocalizationStatusCb(self, msg):
-    if msg.state == "READY":
-        if self.robot_environment != msg.environment:
-          rospy.loginfo('%s::rlcLocalizationStatusCb: The current environment %s has changed %s. Frame %s -> %s',rospy.get_name(),self.robot_environment, msg.environment, self.frame_id, msg.pose.header.frame_id)
-          self.robot_environment = msg.environment
-
-          self.frame_id = msg.pose.header.frame_id
-
-          #rospy.loginfo('%s::rlcLocalizationStatusCb: Initializing the master POI',rospy.get_name())
-          # Removes and creates the manager
-          self.erase(self.initial_point.name)
-          self.initial_point = PointPath('POIManager', 'POIManager', frame_id = self.frame_id, is_manager=True)
-          self.insert(self.initial_point, self.initial_point.processFeedback)
-          self.menu_handler.setVisible(self.entry_new, True)
-          self.menu_handler.setVisible(self.entry_edit, False)
-          self.menu_handler.setVisible(self.entry_delete, False)
-          self.menu_handler.setVisible(self.entry_new_from_robot_pose, True)
-          self.menu_handler.apply( self, self.initial_point.name )
-          self.applyChanges()
-
-          req = SetBoolRequest()
-          req.data=True
-          resp = self.serviceLoadPOIs(req)
-          if resp[0] == False:
-            rospy.logerr("%s::rlcLocalizationStatusCb: %s", self.node_name, resp[1])
-    else:
-        if self.robot_environment != '':
-            rospy.logwarn('%s::rlcLocalizationStatusCb: localization status (%s) is not ready, unsetting current enviroment',rospy.get_name(), msg.state)
-            self.robot_environment = ''
-            req = SetBoolRequest()
-            req.data=True
-            resp = self.serviceLoadPOIs(req)
-            if resp[0] == False:
-              rospy.logerr("%s::rlcLocalizationStatusCb: %s", self.node_name, resp[1])
+    self.rlc_status_time = rospy.Time.now()
+    self.rlc_status_msg = msg
 
 
   def jointStatesCb(self, msg):
@@ -647,7 +655,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.rlc_localization_status_subscriber = rospy.Subscriber(self.rlc_localization_status_topic_name, LocalizationStatus, self.rlcLocalizationStatusCb)
     self.joint_state_subscriber = rospy.Subscriber('joint_states', JointState, self.jointStatesCb)
     # service servers
-    self.load_poi_tag_service_server = rospy.Service('~load_pois', SetBool, self.serviceLoadPOIs)
+    # self.load_poi_tag_service_server = rospy.Service('~load_pois', SetBool, self.serviceLoadPOIs)
     self.delete_all_poi_tag_service_server = rospy.Service('~delete_all_pois', SetBool, self.serviceDeleteAllPOIs)
 
     self.service_get_current_pose_service = rospy.Service('~get_current_pose', GetPoseTrigger, self.getCurrentPoseCB)
@@ -679,6 +687,27 @@ class PointPathManager(InteractiveMarkerServer):
     if self._state.action == PoiState.GOTO:
       if self.planner_client.getState() != GoalStatus.ACTIVE:
         self.switchToAction(PoiState.IDLE)
+    
+    # Check the RLC status is being received
+    if self.rlc_status_time!= None and (rospy.Time.now() - self.rlc_status_time).to_sec() > self.rlc_status_timeout:
+      if self.robot_environment != '':
+          rospy.logwarn('%s::controlLoop: localization status is not being received, unsetting current enviroment',rospy.get_name())
+          self.robot_environment = ''
+          self.disableManager()
+    else:
+      if self.rlc_status_msg!= None and self.rlc_status_msg.state == "READY" and self.rlc_status_msg.reliable == True:
+        if self.robot_environment != self.rlc_status_msg.environment:
+          rospy.loginfo('%s::controlLoop: The current environment %s has changed %s. Frame %s -> %s',rospy.get_name(),self.robot_environment, self.rlc_status_msg.environment, self.frame_id, self.rlc_status_msg.pose.header.frame_id)
+          self.robot_environment = self.rlc_status_msg.environment
+          self.frame_id = self.rlc_status_msg.pose.header.frame_id
+          #rospy.loginfo('%s::controlLoop: Initializing the master POI',rospy.get_name())
+          # Removes and creates the manager
+          self.enableManager()
+      else:
+        if self.robot_environment != '':
+          rospy.logwarn('%s::controlLoop: localization status (%s) is not ready, unsetting current enviroment',rospy.get_name(), self.rlc_status_msg.state)
+          self.robot_environment = ''
+          self.disableManager()
 
     return
 
@@ -853,12 +882,14 @@ class PointPathManager(InteractiveMarkerServer):
   def serviceDeleteAllPOIs(self, req):
     if(req.data==True):
       try:
-        rospy.loginfo("%s::deleteAllPOIs %d",self.node_name,len(self.list_of_points))
-        for i in range(0,len(self.list_of_points)):
+        rospy.loginfo("%s::serviceDeleteAllPOIs %d",self.node_name,len(self.list_of_points))
+        self.deleteAllPOIs()
+        '''for i in range(0,len(self.list_of_points)):
           p=self.list_of_points.pop()
           self.erase(p.name)
           self.counter_points = self.counter_points - 1
           self.applyChanges()
+        '''
         self.delete_environment_from_poi_manager()
         return True,'OK'
       except:
@@ -899,11 +930,13 @@ class PointPathManager(InteractiveMarkerServer):
             return False,'Exception'
 
       # Deletes all the visualized points
-      for i in range(0,len(self.list_of_points)):
+      self.deleteAllPOIs()
+      '''for i in range(0,len(self.list_of_points)):
         p=self.list_of_points.pop()
         self.erase(p.name)
         self.counter_points = self.counter_points - 1
         self.applyChanges()
+      '''
       #create	the POis
       for elem in poi_list:
         self.newPOIfromPose3D(elem.pose, elem.name, elem.frame_id)

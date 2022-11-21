@@ -318,7 +318,7 @@ class PointPathManager(InteractiveMarkerServer):
     self._default_pose_covariance = [0.25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.06853891945200942]
 
     self.h_all_pois_entry = self.menu_handler.insert( "ALL POIs" )
-    self.entry_delete = self.menu_handler.insert( "Delete", parent=self.h_all_pois_entry, callback=self.deleteAllPOIs )
+    self.entry_delete_all = self.menu_handler.insert( "Delete", parent=self.h_all_pois_entry, callback=self.deleteAllPOIs )
 
     # Creates the first point (manager)
     self.disableManager()
@@ -352,13 +352,15 @@ class PointPathManager(InteractiveMarkerServer):
     
     self.initial_point = PointPath('POIManager', 'POIManager', frame_id = self.frame_id, is_manager=True, color = self.marker_red_color)
     self.insert(self.initial_point, self.initial_point.processFeedback)
-    self.menu_handler.setVisible(self.h_poi_entry, True)
+    
     self.menu_handler.setVisible(self.h_navigation_entry, True)
     self.menu_handler.setVisible(self.h_loc_entry, True)
     self.menu_handler.setVisible(self.h_all_pois_entry, True)
     self.menu_handler.setVisible(self.entry_new, True)
     self.menu_handler.setVisible(self.entry_edit, False)
     self.menu_handler.setVisible(self.entry_delete, False)
+    self.menu_handler.setVisible(self.entry_delete_all, True)
+    self.menu_handler.setVisible(self.h_poi_entry, True)
     self.menu_handler.setVisible(self.entry_new_from_robot_pose, True)
     self.menu_handler.apply( self, self.initial_point.name )
     self.applyChanges()

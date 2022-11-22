@@ -31,6 +31,7 @@ import rospy, rospkg
 import copy
 import os
 import math
+import re
 
 from interactive_markers.interactive_marker_server import *
 from visualization_msgs.msg import InteractiveMarker, Marker, InteractiveMarkerControl
@@ -270,7 +271,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.list_of_points = []
     self.frame_id = args['frame_id']
     self.base_frame_id = args['base_frame_id']
-    self.counter_points = 0
+    self.counter_points_index = 0
     self.init_pose_topic_name = args['init_pose_topic_name']
     self.goto_planner_action_name = args['goto_planner']
     self.load_pois_service_name = args['load_pois_service_name']
@@ -318,7 +319,7 @@ class PointPathManager(InteractiveMarkerServer):
     self._default_pose_covariance = [0.25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.06853891945200942]
 
     self.h_all_pois_entry = self.menu_handler.insert( "ALL POIs" )
-    self.entry_delete_all = self.menu_handler.insert( "Delete", parent=self.h_all_pois_entry, callback=self.deleteAllPOIs )
+    self.entry_delete_all = self.menu_handler.insert( "Delete", parent=self.h_all_pois_entry, callback=self.deleteAllPOIsCb )
 
     # Creates the first point (manager)
     self.disableManager()
@@ -384,7 +385,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.menu_handler.setVisible(self.h_all_pois_entry, False)
     self.menu_handler.setVisible(self.entry_new_from_robot_pose, False)
     self.menu_handler.apply( self, new_point.name )
-    self.counter_points = self.counter_points + 1
+    self.counter_points_index +=  1
     
 
 
@@ -457,7 +458,7 @@ class PointPathManager(InteractiveMarkerServer):
 
   ## @brief Callback called to create new POI from Menu
   def createNewPOI(self, feedback):
-    new_point = self.newPOIfromPose(feedback.pose, 'p%d'%(self.counter_points), is_editable=False)
+    new_point = self.newPOIfromPose(feedback.pose, 'p%d'%(self.counter_points_index), is_editable=False)
 
 
     rospy.loginfo("%s::createNewPOI: %s, environment: %s" ,self.node_name, self.add_poi_service_name, self.robot_environment)
@@ -481,7 +482,7 @@ class PointPathManager(InteractiveMarkerServer):
     robot_pose.orientation.y = current_pose[3][1]
     robot_pose.orientation.z = current_pose[3][2]
     robot_pose.orientation.w = current_pose[3][3]
-    new_point = self.newPOIfromPose(robot_pose, 'p%d'%(self.counter_points), is_editable=False)
+    new_point = self.newPOIfromPose(robot_pose, 'p%d'%(self.counter_points_index), is_editable=False)
     rospy.loginfo("%s::createNewPOIFromRobotPose: %s ,environment: %s" ,self.node_name, self.add_poi_service_name,self.robot_environment)
 
     success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose, self.joint_states_dict)
@@ -489,25 +490,28 @@ class PointPathManager(InteractiveMarkerServer):
     #TODO: error feedback
     self.applyChanges()
 
-
   ## @brief Callback called to delete all
+  def deleteAllPOIsCb(self, feedback):
+
+    self.deleteAllPOIs()
+
+  ## @brief Method to delete all POIs
   def deleteAllPOIs(self):
     rospy.loginfo("%s::deleteAllPOIs %d",rospy.get_name(), len(self.list_of_points))
     for i in range(0,len(self.list_of_points)):
       p=self.list_of_points.pop()
-      self.erase(p.name)
-      self.counter_points = self.counter_points - 1
+      self.erase(p.name)     
       self.applyChanges()
+    self.counter_points_index = 0
 
   ## @brief Callback called to delete point
   def deletePOI(self, feedback):
-    rospy.loginfo("%s::deletePOI",rospy.get_name())
     if len(self.list_of_points) > 0:
       for i in self.list_of_points:
         if i.name==feedback.marker_name:
+          rospy.logwarn("%s::deletePOI: %s",rospy.get_name(), i.name)
           self.list_of_points.remove(i)
           self.erase(i.name)
-          #self.counter_points = self.counter_points - 1
           self.delete_poi_from_poi_manager(i.name)
           break
       self.applyChanges()
@@ -516,7 +520,7 @@ class PointPathManager(InteractiveMarkerServer):
 
   def editPOI(self, feedback):
     rospy.loginfo("%s::editPOI: %s menu:%s"%(rospy.get_name(),feedback.marker_name,feedback.menu_entry_id))
-    if self.counter_points > 0:
+    if self.counter_points_index > 0:
       handle = feedback.menu_entry_id
       state = self.menu_handler.getCheckState( handle )
       #check if is already editing
@@ -615,7 +619,7 @@ class PointPathManager(InteractiveMarkerServer):
     robot_pose.orientation.w = current_pose[3][3]
 
     rospy.loginfo('%s::saveRobotPoseServiceCb',rospy.get_name())
-    new_point = self.newPOIfromPose(robot_pose, 'p%d'%(self.counter_points), is_editable=False)
+    new_point = self.newPOIfromPose(robot_pose, 'p%d'%(self.counter_points_index), is_editable=False)
 
     success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose, self.joint_states_dict)
 
@@ -837,7 +841,7 @@ class PointPathManager(InteractiveMarkerServer):
           if (self.delete_poi_from_poi_manager(i.name)[0]):
             self.list_of_points.remove(i)
             self.erase(i.name)
-            #self.counter_points = self.counter_points - 1
+            #self.counter_points_index = self.counter_points_index - 1
             resp.success = True
             resp.message = "Deleted"
             break
@@ -867,7 +871,7 @@ class PointPathManager(InteractiveMarkerServer):
         '''for i in range(0,len(self.list_of_points)):
           p=self.list_of_points.pop()
           self.erase(p.name)
-          self.counter_points = self.counter_points - 1
+          self.counter_points_index = self.counter_points_index - 1
           self.applyChanges()
         '''
         self.delete_environment_from_poi_manager()
@@ -884,8 +888,7 @@ class PointPathManager(InteractiveMarkerServer):
   # @param req: Srv type SetBool, request- bool
   # @return Srv type SetBool, response- bool sucess, message: string
   def loadPoisFromServer(self):
-      rospy.loginfo("%s::loadPoisFromServer: there were %d pois before loading",self.node_name,len(self.list_of_points))
-      rospy.loginfo("%s::loadPoisFromServer: %s, environment: %s" ,self.node_name, self.load_pois_service_name,self.robot_environment)
+      rospy.loginfo("%s::loadPoisFromServer: environment: %s, there were %d pois before loading",self.node_name,self.robot_environment,len(self.list_of_points))
       poi_list=[]
 
       if self.robot_environment != '':
@@ -908,14 +911,25 @@ class PointPathManager(InteractiveMarkerServer):
             rospy.logerr("%s::loadPoisFromServer: Service call failed: %s",self.node_name,e)
             return False,'Exception'
 
-      # Deletes all the visualized points
+      # Deletes the current list of points
       self.deleteAllPOIs()
-
+      # Looks for the index used when creating pois
+      max_index = 0
       #create	the POis
       for elem in poi_list:
+        x = re.findall("^p[0-9]*$", elem.name)
+        if len(x) > 0:          
+          p = x[0]
+          p_index = int(p.split('p')[1])
+          if p_index > max_index:
+            max_index = p_index
+
         self.newPOIfromPose3D(elem.pose, elem.name, elem.frame_id)
+      
+      self.counter_points_index = max_index + 1
+
       self.applyChanges()
-      rospy.loginfo("%s::loadPoisFromServer: there are %d pois after loading",self.node_name,len(self.list_of_points))
+      rospy.loginfo("%s::loadPoisFromServer: there are %d pois after loading. New point index = %d",self.node_name,len(self.list_of_points),self.counter_points_index)
       return True,'OK'
 
 

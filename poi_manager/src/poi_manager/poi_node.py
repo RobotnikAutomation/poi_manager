@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from poi import PoiManager
+from poi_manager.poi import PoiManager
 
 
 def main():

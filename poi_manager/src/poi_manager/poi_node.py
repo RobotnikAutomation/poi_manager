@@ -1,7 +1,11 @@
 #!/usr/bin/env python
-
+import sys
 import rospy
-from poi_manager.poi import PoiManager
+
+if sys.version_info.major == 3.0:
+    from poi_manager.poi import PoiManager
+else:
+    from poi import PoiManager
 
 
 def main():

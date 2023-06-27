@@ -149,7 +149,7 @@ class PoiManager(RComponent):
         #    self.update_marker_array()
 
     def update_yaml(self):
-        yaml_file = file(self.yaml_path, 'w')
+        yaml_file = open(self.yaml_path, 'w')
         yaml.dump(self.pose_dict, yaml_file)
         if self.publish_markers:
             self.update_marker_array()
@@ -370,7 +370,7 @@ class PoiManager(RComponent):
         try:
             del (self.pose_dict['environments'][req.environment]['points'])
             del (self.pose_dict['environments'][req.environment])
-            yaml_file = file(self.yaml_path, 'w')
+            yaml_file = open(self.yaml_path, 'w')
             yaml.dump(self.pose_dict, yaml_file)
             response.success = True
             response.message = "Environment %s deleted" % (req.environment )
@@ -403,7 +403,7 @@ class PoiManager(RComponent):
             self.delete_empty_environment(req.environment)
             response.success = True
             response.message = "point %s from environment %s deleted" % (req.name,req.environment )
-            yaml_file = file(self.yaml_path, 'w')
+            yaml_file = open(self.yaml_path, 'w')
             yaml.dump(self.pose_dict, yaml_file)
         except Exception as identifier:
             msg = "%s::Error deleting point %s from environment %s. Error msg:%s" % (rospy.get_name(),req.name,req.environment,identifier)
@@ -440,7 +440,7 @@ class PoiManager(RComponent):
             #print (self.pose_list)
 
             success,msg=self.process_pose_dictionary()
-            yaml_file = file(self.yaml_path, 'w')
+            yaml_file = open(self.yaml_path, 'w')
             yaml.dump(self.pose_dict, yaml_file, default_flow_style=False)
 
             if success == False:

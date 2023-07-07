@@ -49,6 +49,7 @@ from robotnik_msgs.msg import State
 from robotnik_msgs.srv import SetString, SetStringResponse
 from robot_local_control_msgs.msg import LocalizationStatus
 from tf import TransformListener
+from tf.transformations import quaternion_from_euler
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA 
 
@@ -857,6 +858,49 @@ class PointPathManager(InteractiveMarkerServer):
       resp.message = "The point " + req.name +" doesn't exist"
     self.applyChanges()
     return resp
+  
+  def addPoiCB(self, req):
+    response = AddPOI_paramsResponse()
+
+    if (req.environment != self.robot_environment):
+      msg = "Cannot add a POI to an environment (%s) different to active one (%s)" % (req.environment, self.robot_environment)
+      rospy.logerr("%s::addPoiCB: %s" % (self.node_name, msg))
+      response.success = False
+      response.message = msg
+      return response       
+
+    poi = LabeledPose()
+    poi.name = req.name
+    poi.environment = req.environment
+    poi.frame_id = req.frame_id
+    poi.params = req.params
+    poi.pose.position.x = req.x
+    poi.pose.position.y = req.y
+    poi.pose.position.z = req.z
+    quaternion = quaternion_from_euler(req.roll, req.pitch, req.yaw)
+    poi.pose.orientation.x = quaternion[0]
+    poi.pose.orientation.y = quaternion[1]
+    poi.pose.orientation.z = quaternion[2]
+    poi.pose.orientation.w = quaternion[3]
+
+    # AddPoi
+    response_save = self.save_poi_service(poi.name, poi.frame_id, poi.pose, self.joint_states_dict) # Should I manage if this is correctly done?
+    if (response_save[0] == False):
+      msg = response_save[1]
+      rospy.logerr("%s::addPoiCB: %s" % (self.node_name, msg))
+      response.success = response_save[0]
+      response.message = msg
+      return response
+    
+    new_point = self.newPOIfromPose(poi.pose, poi.name, is_editable=False)
+    self.applyChanges()
+
+    msg = "POI %s correfctly added." % req.name
+    rospy.loginfo("%s::addPoiCB: %s " % (self.node_name, msg))
+    response.success = True
+    response.message = msg
+
+    return response
 
   def delete_poi_from_poi_manager(self,name):
     try:

@@ -414,9 +414,26 @@ class PoiManager(RComponent):
     def add_poi_cb(self,req):
         response = AddPOIResponse()
         if req.p.environment == "":
-            response.message = "The environment is empty"
+            msg = "The environment is empty"
+            rospy.logerr("%s::add_poi_cb: %s" % (self._node_name, msg))
+            response.message = msg
             response.success = False
             return response
+        
+        if req.p.name == "":
+            msg = "The name of the POI is empty"
+            rospy.logerr("%s::add_poi_cb: %s" % (self._node_name, msg))
+            response.message = msg
+            response.success = False
+            return response
+        
+        if req.p.frame_id == "":
+            msg = "The frame_id of the POI is empty"
+            rospy.logerr("%s::add_poi_cb: %s" % (self._node_name, msg))
+            response.message = msg
+            response.success = False
+            return response
+        
         try:
             self.try_create_env(self.pose_dict,req.p.environment)
             self.try_create_point(self.pose_dict,req.p.environment,req.p.name)

@@ -648,6 +648,9 @@ class PointPathManager(InteractiveMarkerServer):
 
     self.stop_tag_service_server = rospy.Service('~stop_goto', SetBool, self.serviceStop)
     self.service_server = rospy.Service('~save_robot_pose', Trigger, self.saveRobotPoseServiceCb)
+    self.get_poi_list_server = rospy.Service('~get_poi_list', GetPOIs, self.getPoiListCb)
+    # service clients
+    self.get_poi_list_client = rospy.ServiceProxy(self.load_pois_service_name, GetPOIs)
 
     self.tf_transform_listener = TransformListener()
 
@@ -806,6 +809,13 @@ class PointPathManager(InteractiveMarkerServer):
       error_message = error_message + "State in "  + str(self._state.action)
       return False, error_message
 
+  def getPoiListCb(self, request):
+    if(request.environment == ""):  
+      rospy.logwarn("%s::getPoiListCb: No environment specified in service call, using active environment '%s'" % (self.node_name, self.robot_environment))
+      return self.get_poi_list_client.call(self.robot_environment)
+    else:
+      return self.get_poi_list_client.call(request.environment) 
+  
   # @brief Stops the current route if it's started. If req.data == true it try stop and return OK message or not else return false a msg.
   # @param req: Srv type SetBool, request- bool
   # @return Srv type SetBool, response- bool sucess, message: string
@@ -899,8 +909,7 @@ class PointPathManager(InteractiveMarkerServer):
             rospy.logerr("%s::loadPoisFromServer: %s", self.node_name,e)
             return False,'Exception'
           try:
-            resp = rospy.ServiceProxy(self.load_pois_service_name , GetPOIs)
-            res = resp(self.robot_environment)
+            res = self.get_poi_list_client(self.robot_environment)
             if (res.success or len(res.p_list)==0):
               poi_list=res.p_list
               #print (poi_list,type(poi_list))

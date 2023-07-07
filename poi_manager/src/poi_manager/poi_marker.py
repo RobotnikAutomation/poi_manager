@@ -46,6 +46,7 @@ from poi_manager_msgs.srv import *
 from poi_manager_msgs.msg import *
 from std_msgs.msg import Header
 from robotnik_msgs.msg import State
+from robotnik_msgs.srv import SetString, SetStringResponse
 from robot_local_control_msgs.msg import LocalizationStatus
 from tf import TransformListener
 from sensor_msgs.msg import JointState
@@ -473,7 +474,7 @@ class PointPathManager(InteractiveMarkerServer):
 
     self.applyChanges()
 
-  def createNewPOIFromRobotPose(self, feedback):
+  def createNewPOIFromRobotPose(self, feedback, name=""):
     current_pose = self.getCurrentPose()
     robot_pose = Pose()
     if(not current_pose[0]):
@@ -486,13 +487,23 @@ class PointPathManager(InteractiveMarkerServer):
     robot_pose.orientation.y = current_pose[3][1]
     robot_pose.orientation.z = current_pose[3][2]
     robot_pose.orientation.w = current_pose[3][3]
-    new_point = self.newPOIfromPose(robot_pose, 'p%d'%(self.counter_points_index), is_editable=False)
-    rospy.loginfo("%s::createNewPOIFromRobotPose: %s ,environment: %s" ,self.node_name, self.add_poi_service_name,self.robot_environment)
+    if (name==""):
+      name = 'p%d'%(self.counter_points_index)
+    new_point = self.newPOIfromPose(robot_pose, name, is_editable=False)
+    rospy.loginfo("%s::createNewPOIFromRobotPose: POI %s added using %s ,environment: %s" ,self.node_name, name, self.add_poi_service_name,self.robot_environment)
 
     success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose, self.joint_states_dict)
 
     #TODO: error feedback
     self.applyChanges()
+
+  def createNewPOIFromRobotPoseCb(self, req):
+    self.createNewPOIFromRobotPose(None, req.data)
+    response = SetStringResponse()
+    response.ret.success = True
+    response.ret.message = "POI %s correctly added." % req.data
+    return response
+
 
   ## @brief Callback called to delete all
   def deleteAllPOIsCb(self, feedback):
@@ -609,26 +620,7 @@ class PointPathManager(InteractiveMarkerServer):
     
 
   def saveRobotPoseServiceCb(self, msg):
-    current_pose = self.getCurrentPose()
-    robot_pose = Pose()
-    if(not current_pose[0]):
-      rospy.logerror("%s::saveRobotPoseServiceCb: Error getting current pose: %s" ,self.node_name, current_pose[1])
-      return
-    robot_pose.position.x = current_pose[2][0]
-    robot_pose.position.y = current_pose[2][1]
-    robot_pose.position.z = 0.2
-    robot_pose.orientation.x = current_pose[3][0]
-    robot_pose.orientation.y = current_pose[3][1]
-    robot_pose.orientation.z = current_pose[3][2]
-    robot_pose.orientation.w = current_pose[3][3]
-
-    rospy.loginfo('%s::saveRobotPoseServiceCb',rospy.get_name())
-    new_point = self.newPOIfromPose(robot_pose, 'p%d'%(self.counter_points_index), is_editable=False)
-
-    success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose, self.joint_states_dict)
-
-    self.applyChanges()
-
+    self.createNewPOIFromRobotPose(None)
     return True, "OK"
 
 

@@ -275,6 +275,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.init_pose_topic_name = args['init_pose_topic_name']
     self.goto_planner_action_name = args['goto_planner']
     self.load_pois_service_name = args['load_pois_service_name']
+    self.get_poi_service_name = args['get_poi_service_name']
     self.add_poi_service_name = args['add_poi_service_name']
     self.delete_poi_service_name = args['delete_poi_service_name']
     self.delete_all_pois_service_name = args['delete_all_pois_service_name']
@@ -439,9 +440,12 @@ class PointPathManager(InteractiveMarkerServer):
       p.environment = self.robot_environment
       p.frame_id = frame
       p.pose = pose
-      p.joints = []
-      for i in joints:
-        p.joints.append(PoiJointState(name = i, position = joints[i]))
+      if type(joints) == list:
+        p.joints = joints
+      else:
+        p.joints = []
+        for i in joints:
+          p.joints.append(PoiJointState(name = i, position = joints[i]))
 
       res = resp(p)
 
@@ -649,8 +653,10 @@ class PointPathManager(InteractiveMarkerServer):
     self.stop_tag_service_server = rospy.Service('~stop_goto', SetBool, self.serviceStop)
     self.service_server = rospy.Service('~save_robot_pose', Trigger, self.saveRobotPoseServiceCb)
     self.get_poi_list_server = rospy.Service('~get_poi_list', GetPOIs, self.getPoiListCb)
+    self.update_poi_name_server = rospy.Service('~update_poi_name', UpdatePOIName, self.updatePoiNameCb)
     # service clients
     self.get_poi_list_client = rospy.ServiceProxy(self.load_pois_service_name, GetPOIs)
+    self.get_poi_client = rospy.ServiceProxy(self.get_poi_service_name, GetPOI)
 
     self.tf_transform_listener = TransformListener()
 
@@ -891,6 +897,50 @@ class PointPathManager(InteractiveMarkerServer):
     else:
       return False,'OK'
 
+  def updatePoiNameCb(self, req):
+    response = UpdatePOINameResponse() # This should be custom msg response
+    
+    # Get current POI
+    poi = None
+    joints = []
+    for i in self.list_of_points:
+      if i.name==req.name:
+        poi = self.list_of_points[self.list_of_points.index(i)]
+
+        # To avoid overwriting joints, we need to read joints values from poi_manager...
+        get_poi_req = GetPOIRequest()
+        get_poi_req.environment = self.robot_environment
+        get_poi_req.name = i.name
+        get_poi_res = self.get_poi_client.call(get_poi_req)
+
+        if (get_poi_res.success == False):
+          poi = None
+        else:
+          joints = get_poi_res.p.joints
+
+        break
+
+    if poi is None:
+      msg = "POI with name '%s' does not exists" % req.name
+      response.message = msg
+      rospy.logerr("%s::updatePoiNameCb: %s" % (self.node_name, msg))
+      return response
+    
+    # DeletePoi
+    delete_req = DeletePOIRequest()
+    delete_req.name = req.name
+    self.deletePoiCB(delete_req) # Should I manage if deletion is not correctly done?
+    
+    # AddPoi
+    new_point = self.newPOIfromPose(poi.pose, req.new_name, is_editable=False)
+    self.save_poi_service(req.new_name, poi.header.frame_id, poi.pose, joints) # Should I manage if this is correctly done?
+    self.applyChanges()
+
+    msg = "POI name updated %s -> %s" % (req.name, req.new_name) 
+    rospy.loginfo("%s::updatePoiNameCb: %s" % (self.node_name, msg))
+    response.success = True
+    response.message = msg
+    return response
   #def serviceAddPoint (self, req):
 
 

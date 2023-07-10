@@ -279,6 +279,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.load_pois_service_name = args['load_pois_service_name']
     self.get_poi_service_name = args['get_poi_service_name']
     self.add_poi_service_name = args['add_poi_service_name']
+    self.add_poi_params_service_name = args['add_poi_params_service_name']
     self.delete_poi_service_name = args['delete_poi_service_name']
     self.delete_all_pois_service_name = args['delete_all_pois_service_name']
     self.rlc_localization_status_topic_name = args['rlc_localization_status_topic_name']
@@ -641,15 +642,18 @@ class PointPathManager(InteractiveMarkerServer):
 
     self.service_get_current_pose_service = rospy.Service('~get_current_pose', GetPoseTrigger, self.getCurrentPoseCB)
 
-    self.service_get_current_pose_service = rospy.Service('~delete_poi', DeletePOI, self.deletePoiCB)
+    self.delete_poi_service = rospy.Service('~delete_poi', DeletePOI, self.deletePoiCB)
+    self.add_poi_service = rospy.Service('~add_poi', AddPOI_params, self.addPoiCB)
 
     self.stop_tag_service_server = rospy.Service('~stop_goto', SetBool, self.serviceStop)
     self.service_server = rospy.Service('~save_robot_pose', Trigger, self.saveRobotPoseServiceCb)
+    self.save_named_robot_pose_server = rospy.Service('~save_named_robot_pose', SetString, self.createNewPOIFromRobotPoseCb)
     self.get_poi_list_server = rospy.Service('~get_poi_list', GetPOIs, self.getPoiListCb)
     self.update_poi_name_server = rospy.Service('~update_poi_name', UpdatePOIName, self.updatePoiNameCb)
     # service clients
     self.get_poi_list_client = rospy.ServiceProxy(self.load_pois_service_name, GetPOIs)
     self.get_poi_client = rospy.ServiceProxy(self.get_poi_service_name, GetPOI)
+    self.add_poi_client = rospy.ServiceProxy(self.add_poi_params_service_name, AddPOI_params)
 
     self.tf_transform_listener = TransformListener()
 
@@ -1054,7 +1058,9 @@ if __name__=="__main__":
 	  'goto_planner': 'mb_avoidance/move_base',
 	  'init_pose_topic_name': 'initialpose',
 	  'load_pois_service_name': 'poi_manager/get_poi_list',
+	  'get_poi_service_name': 'poi_manager/get_poi',
     'add_poi_service_name': 'poi_manager/add_poi',
+    'add_poi_params_service_name': 'poi_manager/add_poi_by_params',
     'delete_poi_service_name': 'poi_manager/delete_poi',
     'delete_all_pois_service_name': 'poi_manager/delete_environment',
     'rlc_localization_status_topic_name' : 'robot_local_control/LocalizationComponent/status'

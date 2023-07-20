@@ -46,8 +46,10 @@ from poi_manager_msgs.srv import *
 from poi_manager_msgs.msg import *
 from std_msgs.msg import Header
 from robotnik_msgs.msg import State
+from robotnik_msgs.srv import SetString, SetStringResponse
 from robot_local_control_msgs.msg import LocalizationStatus
 from tf import TransformListener
+from tf.transformations import quaternion_from_euler
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA 
 
@@ -275,7 +277,9 @@ class PointPathManager(InteractiveMarkerServer):
     self.init_pose_topic_name = args['init_pose_topic_name']
     self.goto_planner_action_name = args['goto_planner']
     self.load_pois_service_name = args['load_pois_service_name']
+    self.get_poi_service_name = args['get_poi_service_name']
     self.add_poi_service_name = args['add_poi_service_name']
+    self.add_poi_params_service_name = args['add_poi_params_service_name']
     self.delete_poi_service_name = args['delete_poi_service_name']
     self.delete_all_pois_service_name = args['delete_all_pois_service_name']
     self.rlc_localization_status_topic_name = args['rlc_localization_status_topic_name']
@@ -439,9 +443,12 @@ class PointPathManager(InteractiveMarkerServer):
       p.environment = self.robot_environment
       p.frame_id = frame
       p.pose = pose
-      p.joints = []
-      for i in joints:
-        p.joints.append(PoiJointState(name = i, position = joints[i]))
+      if type(joints) == list:
+        p.joints = joints
+      else:
+        p.joints = []
+        for i in joints:
+          p.joints.append(PoiJointState(name = i, position = joints[i]))
 
       res = resp(p)
 
@@ -469,7 +476,7 @@ class PointPathManager(InteractiveMarkerServer):
 
     self.applyChanges()
 
-  def createNewPOIFromRobotPose(self, feedback):
+  def createNewPOIFromRobotPose(self, feedback, name=""):
     current_pose = self.getCurrentPose()
     robot_pose = Pose()
     if(not current_pose[0]):
@@ -482,13 +489,23 @@ class PointPathManager(InteractiveMarkerServer):
     robot_pose.orientation.y = current_pose[3][1]
     robot_pose.orientation.z = current_pose[3][2]
     robot_pose.orientation.w = current_pose[3][3]
-    new_point = self.newPOIfromPose(robot_pose, 'p%d'%(self.counter_points_index), is_editable=False)
-    rospy.loginfo("%s::createNewPOIFromRobotPose: %s ,environment: %s" ,self.node_name, self.add_poi_service_name,self.robot_environment)
+    if (name==""):
+      name = 'p%d'%(self.counter_points_index)
+    new_point = self.newPOIfromPose(robot_pose, name, is_editable=False)
+    rospy.loginfo("%s::createNewPOIFromRobotPose: POI %s added using %s ,environment: %s" ,self.node_name, name, self.add_poi_service_name,self.robot_environment)
 
     success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose, self.joint_states_dict)
 
     #TODO: error feedback
     self.applyChanges()
+
+  def createNewPOIFromRobotPoseCb(self, req):
+    self.createNewPOIFromRobotPose(None, req.data)
+    response = SetStringResponse()
+    response.ret.success = True
+    response.ret.message = "POI %s correctly added." % req.data
+    return response
+
 
   ## @brief Callback called to delete all
   def deleteAllPOIsCb(self, feedback):
@@ -605,26 +622,7 @@ class PointPathManager(InteractiveMarkerServer):
     
 
   def saveRobotPoseServiceCb(self, msg):
-    current_pose = self.getCurrentPose()
-    robot_pose = Pose()
-    if(not current_pose[0]):
-      rospy.logerror("%s::saveRobotPoseServiceCb: Error getting current pose: %s" ,self.node_name, current_pose[1])
-      return
-    robot_pose.position.x = current_pose[2][0]
-    robot_pose.position.y = current_pose[2][1]
-    robot_pose.position.z = 0.2
-    robot_pose.orientation.x = current_pose[3][0]
-    robot_pose.orientation.y = current_pose[3][1]
-    robot_pose.orientation.z = current_pose[3][2]
-    robot_pose.orientation.w = current_pose[3][3]
-
-    rospy.loginfo('%s::saveRobotPoseServiceCb',rospy.get_name())
-    new_point = self.newPOIfromPose(robot_pose, 'p%d'%(self.counter_points_index), is_editable=False)
-
-    success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose, self.joint_states_dict)
-
-    self.applyChanges()
-
+    self.createNewPOIFromRobotPose(None)
     return True, "OK"
 
 
@@ -644,10 +642,18 @@ class PointPathManager(InteractiveMarkerServer):
 
     self.service_get_current_pose_service = rospy.Service('~get_current_pose', GetPoseTrigger, self.getCurrentPoseCB)
 
-    self.service_get_current_pose_service = rospy.Service('~delete_poi', DeletePOI, self.deletePoiCB)
+    self.delete_poi_service = rospy.Service('~delete_poi', DeletePOI, self.deletePoiCB)
+    self.add_poi_service = rospy.Service('~add_poi', AddPOI_params, self.addPoiCB)
 
     self.stop_tag_service_server = rospy.Service('~stop_goto', SetBool, self.serviceStop)
     self.service_server = rospy.Service('~save_robot_pose', Trigger, self.saveRobotPoseServiceCb)
+    self.save_named_robot_pose_server = rospy.Service('~save_named_robot_pose', SetString, self.createNewPOIFromRobotPoseCb)
+    self.get_poi_list_server = rospy.Service('~get_poi_list', GetPOIs, self.getPoiListCb)
+    self.update_poi_name_server = rospy.Service('~update_poi_name', UpdatePOIName, self.updatePoiNameCb)
+    # service clients
+    self.get_poi_list_client = rospy.ServiceProxy(self.load_pois_service_name, GetPOIs)
+    self.get_poi_client = rospy.ServiceProxy(self.get_poi_service_name, GetPOI)
+    self.add_poi_client = rospy.ServiceProxy(self.add_poi_params_service_name, AddPOI_params)
 
     self.tf_transform_listener = TransformListener()
 
@@ -806,6 +812,13 @@ class PointPathManager(InteractiveMarkerServer):
       error_message = error_message + "State in "  + str(self._state.action)
       return False, error_message
 
+  def getPoiListCb(self, request):
+    if(request.environment == ""):  
+      rospy.logwarn("%s::getPoiListCb: No environment specified in service call, using active environment '%s'" % (self.node_name, self.robot_environment))
+      return self.get_poi_list_client.call(self.robot_environment)
+    else:
+      return self.get_poi_list_client.call(request.environment) 
+  
   # @brief Stops the current route if it's started. If req.data == true it try stop and return OK message or not else return false a msg.
   # @param req: Srv type SetBool, request- bool
   # @return Srv type SetBool, response- bool sucess, message: string
@@ -849,6 +862,49 @@ class PointPathManager(InteractiveMarkerServer):
       resp.message = "The point " + req.name +" doesn't exist"
     self.applyChanges()
     return resp
+  
+  def addPoiCB(self, req):
+    response = AddPOI_paramsResponse()
+
+    if (req.environment != self.robot_environment):
+      msg = "Cannot add a POI to an environment (%s) different to active one (%s)" % (req.environment, self.robot_environment)
+      rospy.logerr("%s::addPoiCB: %s" % (self.node_name, msg))
+      response.success = False
+      response.message = msg
+      return response       
+
+    poi = LabeledPose()
+    poi.name = req.name
+    poi.environment = req.environment
+    poi.frame_id = req.frame_id
+    poi.params = req.params
+    poi.pose.position.x = req.x
+    poi.pose.position.y = req.y
+    poi.pose.position.z = req.z
+    quaternion = quaternion_from_euler(req.roll, req.pitch, req.yaw)
+    poi.pose.orientation.x = quaternion[0]
+    poi.pose.orientation.y = quaternion[1]
+    poi.pose.orientation.z = quaternion[2]
+    poi.pose.orientation.w = quaternion[3]
+
+    # AddPoi
+    response_save = self.save_poi_service(poi.name, poi.frame_id, poi.pose, self.joint_states_dict) # Should I manage if this is correctly done?
+    if (response_save[0] == False):
+      msg = response_save[1]
+      rospy.logerr("%s::addPoiCB: %s" % (self.node_name, msg))
+      response.success = response_save[0]
+      response.message = msg
+      return response
+    
+    new_point = self.newPOIfromPose(poi.pose, poi.name, is_editable=False)
+    self.applyChanges()
+
+    msg = "POI %s correfctly added." % req.name
+    rospy.loginfo("%s::addPoiCB: %s " % (self.node_name, msg))
+    response.success = True
+    response.message = msg
+
+    return response
 
   def delete_poi_from_poi_manager(self,name):
     try:
@@ -881,6 +937,46 @@ class PointPathManager(InteractiveMarkerServer):
     else:
       return False,'OK'
 
+  def updatePoiNameCb(self, req):
+    response = UpdatePOINameResponse()
+
+    environment = req.environment
+    if (environment == ""):
+      rospy.logwarn("%s::updatePoiNameCb: Using current environment '%s'" % (self.node_name, self.robot_environment))
+      environment = self.robot_environment
+       
+       
+    # To avoid overwriting joints, we need to read joints values from poi_manager...
+    get_poi_req = GetPOIRequest()
+    get_poi_req.environment = environment
+    get_poi_req.name = req.name
+    get_poi_res = self.get_poi_client.call(get_poi_req)
+    
+    if (get_poi_res.success == False):
+      msg = "POI with name '%s' does not exists in environment '%s'" % (req.name, environment)
+      response.message = msg
+      rospy.logerr("%s::updatePoiNameCb: %s" % (self.node_name, msg))
+      return response
+    
+    # DeletePoi
+    delete_req = DeletePOIRequest()
+    delete_req.name = req.name
+    self.deletePoiCB(delete_req) # Should I manage if deletion is not correctly done?
+    
+    # AddPoi
+    # If the target environment is the current environment, we need to update graphics
+    if (environment == self.robot_environment):
+      new_point = self.newPOIfromPose(get_poi_res.p.pose, req.new_name, is_editable=False)
+      self.save_poi_service(req.new_name, get_poi_res.p.frame_id, get_poi_res.p.pose, get_poi_res.p.joints) # Should I manage if this is correctly done?
+      self.applyChanges()
+    else:
+      self.save_poi_service(req.new_name, get_poi_res.p.frame_id, get_poi_res.p.pose, get_poi_res.p.joints) # Should I manage if this is correctly done?
+       
+    msg = "POI name updated %s -> %s" % (req.name, req.new_name) 
+    rospy.loginfo("%s::updatePoiNameCb: %s" % (self.node_name, msg))
+    response.success = True
+    response.message = msg
+    return response
   #def serviceAddPoint (self, req):
 
 
@@ -899,8 +995,7 @@ class PointPathManager(InteractiveMarkerServer):
             rospy.logerr("%s::loadPoisFromServer: %s", self.node_name,e)
             return False,'Exception'
           try:
-            resp = rospy.ServiceProxy(self.load_pois_service_name , GetPOIs)
-            res = resp(self.robot_environment)
+            res = self.get_poi_list_client(self.robot_environment)
             if (res.success or len(res.p_list)==0):
               poi_list=res.p_list
               #print (poi_list,type(poi_list))
@@ -959,7 +1054,9 @@ if __name__=="__main__":
 	  'goto_planner': 'mb_avoidance/move_base',
 	  'init_pose_topic_name': 'initialpose',
 	  'load_pois_service_name': 'poi_manager/get_poi_list',
+	  'get_poi_service_name': 'poi_manager/get_poi',
     'add_poi_service_name': 'poi_manager/add_poi',
+    'add_poi_params_service_name': 'poi_manager/add_poi_by_params',
     'delete_poi_service_name': 'poi_manager/delete_poi',
     'delete_all_pois_service_name': 'poi_manager/delete_environment',
     'rlc_localization_status_topic_name' : 'robot_local_control/LocalizationComponent/status'

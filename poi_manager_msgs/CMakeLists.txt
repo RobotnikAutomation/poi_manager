@@ -25,6 +25,7 @@ add_service_files(
   AddPOIs.srv
   GetEnvironments.srv
   GetPoseTrigger.srv
+  UpdatePOIName.srv
 )
 
 generate_messages(

@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>poi_manager</name>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
   <description>The poi_manager package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
@@ -17,7 +17,6 @@
   <build_depend>rospy</build_depend>
   <build_depend>robotnik_msgs</build_depend>
   <build_depend>robot_local_control_msgs</build_depend>
-  <build_depend>robotnik_msgs</build_depend>
   <exec_depend>rospy</exec_depend>
   <exec_depend>poi_manager_msgs</exec_depend>
   <exec_depend>robotnik_msgs</exec_depend>

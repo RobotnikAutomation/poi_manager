@@ -116,18 +116,22 @@ class InitPoseClient():
 		self.topic_name = topic_name
 		# Creates a ROS publisher
 		self.client = rospy.Publisher(topic_name, PoseWithCovarianceStamped, queue_size=10)
+    # Init variable to store init pose
+		self.init_pose = Pose()
 
 	## @brief Sends the pose
 	## @param goal_pose as geometry_msgs/PoseStamped
 	## @return 0 if OK, -1 if no server, -2 if it's tracking a goal at the moment
 	def setPose(self, pose):
+		self.init_pose = pose.pose.pose
 		rospy.loginfo('%s::InitPoseClient:setPose: setting pose', rospy.get_name())
 		self.client.publish(pose)
 
 		return
-		self.client.publish(pose)
 
-		return
+	def getInitPose(self):
+		return self.init_pose
+
 
 class PointPath(InteractiveMarker):
 
@@ -297,11 +301,10 @@ class PointPathManager(InteractiveMarkerServer):
 
     self.rlc_status_timeout = 2.0
 
-    # Menu handler to create a menu
-    self.initMenuHandlers()
-
     self.rosSetup()
 
+    # Menu handler to create a menu
+    self.initMenuHandlers()
 
   def initMenuHandlers(self):
     self.menu_handler = MenuHandler()
@@ -336,6 +339,7 @@ class PointPathManager(InteractiveMarkerServer):
     if self.initial_point != None:
       self.erase(self.initial_point.name)
     self.initial_point = PointPath('POIManager', 'POIManager', frame_id = self.frame_id, is_manager=True, color = self.marker_black_color)
+    self.initial_point.pose = self.init_pose_client.getInitPose()
     self.insert(self.initial_point, self.initial_point.processFeedback)
 
     ##if is_manager menu Edit and remove have not any sense
@@ -354,10 +358,9 @@ class PointPathManager(InteractiveMarkerServer):
     '''
     if self.initial_point != None:
       self.erase(self.initial_point.name)
-    
     self.initial_point = PointPath('POIManager', 'POIManager', frame_id = self.frame_id, is_manager=True, color = self.marker_red_color)
+    self.initial_point.pose = self.init_pose_client.getInitPose()
     self.insert(self.initial_point, self.initial_point.processFeedback)
-    
     self.menu_handler.setVisible(self.h_navigation_entry, True)
     self.menu_handler.setVisible(self.h_loc_entry, True)
     self.menu_handler.setVisible(self.h_all_pois_entry, True)

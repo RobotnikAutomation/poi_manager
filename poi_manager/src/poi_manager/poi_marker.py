@@ -36,7 +36,10 @@ import re
 from interactive_markers.interactive_marker_server import *
 from visualization_msgs.msg import InteractiveMarker, Marker, InteractiveMarkerControl
 from interactive_markers.menu_handler import *
-from move_base_msgs.msg import *
+from move_base_msgs.msg import MoveBaseAction as mb_msg_action
+from mbf_msgs.msg import MoveBaseAction as mbf_msg_action
+from move_base_msgs.msg import MoveBaseGoal as mb_msg_goal
+from mbf_msgs.msg import MoveBaseGoal as mbf_msg_goal
 
 import actionlib
 from actionlib_msgs.msg import GoalStatus, GoalID
@@ -65,7 +68,13 @@ class MoveBaseClient():
 		self.planner_name = planner_name
 		# Creates the SimpleActionClient, passing the type of the action
 		# (GoTo) to the constructor.
-		self.client = actionlib.SimpleActionClient(planner_name, MoveBaseAction)
+		if "flex" in planner_name:
+			self.msg_action = mbf_msg_action
+			self.msg_goal = mbf_msg_goal
+		else:
+			self.msg_action = mb_msg_action
+			self.msg_goal = mb_msg_goal
+		self.client = actionlib.SimpleActionClient(planner_name, self.msg_action)
 
 	## @brief Sends the goal to
 	## @param goal_pose as geometry_msgs/PoseStamped
@@ -74,7 +83,7 @@ class MoveBaseClient():
 		# Waits until the action server has started up and started
 		# listening for goals.
 		if self.client.wait_for_server(timeout = rospy.Duration(3.0) ):
-			goal = MoveBaseGoal()
+			goal = self.msg_goal()
 			#set goal
 			goal.target_pose = goal_pose
 			self.client.send_goal(goal)

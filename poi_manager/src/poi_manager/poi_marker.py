@@ -139,11 +139,8 @@ class MoveBaseClient():
 
 	def _getModuleAndName(self, topic):
 		namespace = rospy.get_namespace()
-		if not topic.startswith(namespace):
+		if not topic[0] == '/':
 			topic = namespace + topic
-		else:
-			if not topic[0] == '/':
-				topic = '/' + topic
 		msg_type, topic, _ = rostopic.get_topic_class(topic)
 		#module = '.'.join(msg_type.__module__.split('.')[:-1])
 		module = msg_type.__module__

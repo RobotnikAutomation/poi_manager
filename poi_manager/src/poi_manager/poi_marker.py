@@ -27,19 +27,18 @@ POSSIBILITY OF SUCH DAMAGE.
 """
 
 import roslib; roslib.load_manifest("interactive_markers")
-import rospy, rospkg
+import rospy, rospkg, rostopic
 import copy
 import os
 import math
 import re
+import importlib
 
 from interactive_markers.interactive_marker_server import *
 from visualization_msgs.msg import InteractiveMarker, Marker, InteractiveMarkerControl
 from interactive_markers.menu_handler import *
-from move_base_msgs.msg import MoveBaseAction as mb_msg_action
-from mbf_msgs.msg import MoveBaseAction as mbf_msg_action
-from move_base_msgs.msg import MoveBaseGoal as mb_msg_goal
-from mbf_msgs.msg import MoveBaseGoal as mbf_msg_goal
+from robot_simple_command_sequencer.command_manager_interface import CommandManagerInterface
+from robot_simple_command_manager_msgs.msg import RobotSimpleCommandGoal
 
 import actionlib
 from actionlib_msgs.msg import GoalStatus, GoalID
@@ -52,7 +51,7 @@ from robotnik_msgs.msg import State
 from robotnik_msgs.srv import SetString, SetStringResponse
 from robot_local_control_msgs.msg import LocalizationStatus
 from tf import TransformListener
-from tf.transformations import quaternion_from_euler
+from tf.transformations import quaternion_from_euler, euler_from_quaternion
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA 
 
@@ -63,29 +62,46 @@ from std_msgs.msg import ColorRGBA
 # Client based on ActionServer to send goals to the purepursuit node
 class MoveBaseClient():
 
-
-	def __init__(self, planner_name):
+	def __init__(self, planner_name, use_rlc_goto = False):
 		self.planner_name = planner_name
+		self.use_rlc_goto = use_rlc_goto
 		# Creates the SimpleActionClient, passing the type of the action
 		# (GoTo) to the constructor.
-		if "flex" in planner_name:
-			self.msg_action = mbf_msg_action
-			self.msg_goal = mbf_msg_goal
+		if self.use_rlc_goto:
+			self.client = CommandManagerInterface(self.planner_name, 10)
+			self.goal_msg = RobotSimpleCommandGoal
 		else:
-			self.msg_action = mb_msg_action
-			self.msg_goal = mb_msg_goal
-		self.client = actionlib.SimpleActionClient(planner_name, self.msg_action)
+			pkg, name, _ = self._getModuleAndName(self.planner_name + '/goal')
+			pkg_goal = "".join(pkg.split('Action'))
+			name_goal = "".join(name.split('Action'))
+			self.goal_msg = self._importModule(pkg_goal, name_goal)
+			pkg_action = "".join(pkg.split('Goal'))
+			name_action = "".join(name.split('Goal'))
+			action_msg = self._importModule(pkg_action, name_action)	
+			self.client = actionlib.SimpleActionClient(self.planner_name, action_msg)
 
 	## @brief Sends the goal to
 	## @param goal_pose as geometry_msgs/PoseStamped
 	## @return 0 if OK, -1 if no server, -2 if it's tracking a goal at the moment
 	def goTo(self, goal_pose):
+		if self.use_rlc_goto:
+			timeout = 3
+		else:
+			timeout = rospy.Duration(3.0)
 		# Waits until the action server has started up and started
 		# listening for goals.
-		if self.client.wait_for_server(timeout = rospy.Duration(3.0) ):
-			goal = self.msg_goal()
+		if self.client.wait_for_server(timeout):
+			goal = self.goal_msg()
 			#set goal
-			goal.target_pose = goal_pose
+			if not self.use_rlc_goto:
+				goal.target_pose = goal_pose
+			else:
+				x = goal_pose.pose.position.x
+				y = goal_pose.pose.position.y
+				angles = euler_from_quaternion([goal_pose.pose.orientation.x, goal_pose.pose.orientation.y, goal_pose.pose.orientation.z, goal_pose.pose.orientation.w])
+				theta = angles[2]
+				command = " ".join(['RLC_GOTO', str(x), str(y), str(theta)])
+				goal.command.command = command
 			self.client.send_goal(goal)
 			return 0
 		else:
@@ -95,15 +111,18 @@ class MoveBaseClient():
 	## @brief cancel the current goal
 	def cancel(self):
 		rospy.logwarn('%s::MoveBaseClient:cancel: cancelling the goal', rospy.get_name())
-		self.client.cancel_goal()
+		if not self.use_rlc_goto:
+			self.client.cancel_goal()
+		else:
+			self.client.cancel()
 
 	## @brief Get the state information for this goal
-    ##
-    ## Possible States Are: PENDING, ACTIVE, RECALLED, REJECTED,
-    ## PREEMPTED, ABORTED, SUCCEEDED, LOST.
-    ##
-    ## @return The goal's state. Returns LOST if this
-    ## SimpleActionClient isn't tracking a goal.
+		##
+		## Possible States Are: PENDING, ACTIVE, RECALLED, REJECTED,
+		## PREEMPTED, ABORTED, SUCCEEDED, LOST.
+		##
+		## @return The goal's state. Returns LOST if this
+		## SimpleActionClient isn't tracking a goal.
 	def getState(self):
 		return self.client.get_state()
 
@@ -118,6 +137,26 @@ class MoveBaseClient():
 	def wait(self):
 		return self.client.wait_for_result()
 
+	def _getModuleAndName(self, topic):
+		namespace = rospy.get_namespace()
+		if not namespace in topic:
+			topic = namespace + topic
+		else:
+			if not topic[0] == '/':
+				topic = '/' + topic
+		msg_type, topic, _ = rostopic.get_topic_class(topic)
+		#module = '.'.join(msg_type.__module__.split('.')[:-1])
+		module = msg_type.__module__
+		name = msg_type.__name__
+		return module, name, msg_type
+	
+	def _importModule(self, pkg, name):
+		# module_import_name = '.'.join([pkg, name])
+		module_import_name = pkg
+		module = importlib.import_module(module_import_name)
+		object_type = getattr(module, name)
+		return object_type
+
 # Client based on ActionServer to send goals to the purepursuit node
 class InitPoseClient():
 
@@ -125,7 +164,7 @@ class InitPoseClient():
 		self.topic_name = topic_name
 		# Creates a ROS publisher
 		self.client = rospy.Publisher(topic_name, PoseWithCovarianceStamped, queue_size=10)
-    # Init variable to store init pose
+		# Init variable to store init pose
 		self.init_pose = Pose()
 
 	## @brief Sends the pose
@@ -289,6 +328,8 @@ class PointPathManager(InteractiveMarkerServer):
     self.counter_points_index = 0
     self.init_pose_topic_name = args['init_pose_topic_name']
     self.goto_planner_action_name = args['goto_planner']
+    self.command_manager_action_name = args['command_manager_action_name']
+    self.use_rlc_goto = args['use_rlc_goto']
     self.load_pois_service_name = args['load_pois_service_name']
     self.get_poi_service_name = args['get_poi_service_name']
     self.add_poi_service_name = args['add_poi_service_name']
@@ -670,7 +711,11 @@ class PointPathManager(InteractiveMarkerServer):
     self.tf_transform_listener = TransformListener()
 
     # Action clients
-    self.planner_client = MoveBaseClient(planner_name=self.goto_planner_action_name)
+    if self.use_rlc_goto:
+      planner = self.command_manager_action_name
+    else:
+      planner = self.goto_planner_action_name
+    self.planner_client = MoveBaseClient(planner_name=planner, use_rlc_goto=self.use_rlc_goto)
 
     self.init_pose_client = InitPoseClient(self.init_pose_topic_name)
     self._state = PoiState()
@@ -1062,11 +1107,13 @@ if __name__=="__main__":
 
 	arg_defaults = {
     'base_frame_id': 'robot_base_footprint',
-	  'frame_id': 'robot_map',
-	  'goto_planner': 'mb_avoidance/move_base',
-	  'init_pose_topic_name': 'initialpose',
-	  'load_pois_service_name': 'poi_manager/get_poi_list',
-	  'get_poi_service_name': 'poi_manager/get_poi',
+    'frame_id': 'robot_map',
+    'goto_planner': 'mb_avoidance/move_base',
+    'use_rlc_goto': False,
+    'command_manager_action_name': 'command_manager',
+    'init_pose_topic_name': 'initialpose',
+    'load_pois_service_name': 'poi_manager/get_poi_list',
+    'get_poi_service_name': 'poi_manager/get_poi',
     'add_poi_service_name': 'poi_manager/add_poi',
     'add_poi_params_service_name': 'poi_manager/add_poi_by_params',
     'delete_poi_service_name': 'poi_manager/delete_poi',

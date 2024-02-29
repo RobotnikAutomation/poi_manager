@@ -139,7 +139,7 @@ class MoveBaseClient():
 
 	def _getModuleAndName(self, topic):
 		namespace = rospy.get_namespace()
-		if not namespace in topic:
+		if not topic.startswith(namespace):
 			topic = namespace + topic
 		else:
 			if not topic[0] == '/':

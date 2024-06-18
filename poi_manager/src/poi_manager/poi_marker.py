@@ -48,7 +48,7 @@ from poi_manager_msgs.srv import *
 from poi_manager_msgs.msg import *
 from std_msgs.msg import Header
 from robotnik_msgs.msg import State
-from robotnik_msgs.srv import SetString, SetStringResponse
+from robotnik_msgs.srv import SetString, SetStringResponse, GetStringList, GetStringListResponse
 from robot_local_control_msgs.msg import LocalizationStatus
 from tf import TransformListener
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
@@ -700,6 +700,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.save_named_robot_pose_server = rospy.Service('~save_named_robot_pose', SetString, self.createNewPOIFromRobotPoseCb)
     self.get_poi_list_server = rospy.Service('~get_poi_list', GetPOIs, self.getPoiListCb)
     self.update_poi_name_server = rospy.Service('~update_poi_name', UpdatePOIName, self.updatePoiNameCb)
+    self.get_poi_names_list_server = rospy.Service('~get_poi_names_list', GetStringList, self.getPoiNamesListCb)
     # service clients
     self.get_poi_list_client = rospy.ServiceProxy(self.load_pois_service_name, GetPOIs)
     self.get_poi_client = rospy.ServiceProxy(self.get_poi_service_name, GetPOI)
@@ -872,6 +873,15 @@ class PointPathManager(InteractiveMarkerServer):
       return self.get_poi_list_client.call(self.robot_environment)
     else:
       return self.get_poi_list_client.call(request.environment) 
+  
+  
+  def getPoiNamesListCb(self, request):
+    poi_list_response = self.getPoiListCb(GetPOIsRequest())
+    response = GetStringListResponse()
+    response.success = poi_list_response.success
+    response.message = poi_list_response.message
+    response.strings = [poi.name for poi in poi_list_response.p_list]
+    return response
   
   # @brief Stops the current route if it's started. If req.data == true it try stop and return OK message or not else return false a msg.
   # @param req: Srv type SetBool, request- bool

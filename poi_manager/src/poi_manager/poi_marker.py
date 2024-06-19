@@ -878,8 +878,8 @@ class PointPathManager(InteractiveMarkerServer):
   def getPoiNamesListCb(self, request):
     poi_list_response = self.getPoiListCb(GetPOIsRequest())
     response = GetStringListResponse()
-    response.success = poi_list_response.success
-    response.message = poi_list_response.message
+    response.ret.success = poi_list_response.success
+    response.ret.message = poi_list_response.message
     response.strings = [poi.name for poi in poi_list_response.p_list]
     return response
   

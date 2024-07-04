@@ -694,6 +694,7 @@ class PointPathManager(InteractiveMarkerServer):
 
     self.delete_poi_service = rospy.Service('~delete_poi', DeletePOI, self.deletePoiCB)
     self.add_poi_service = rospy.Service('~add_poi', AddPOI_params, self.addPoiCB)
+    self.add_poi_and_joints_service = rospy.Service('~add_poi_and_joints', AddPOIJoints, self.addPoiJointsCB)
 
     self.stop_tag_service_server = rospy.Service('~stop_goto', SetBool, self.serviceStop)
     self.service_server = rospy.Service('~save_robot_pose', Trigger, self.saveRobotPoseServiceCb)
@@ -963,8 +964,52 @@ class PointPathManager(InteractiveMarkerServer):
     new_point = self.newPOIfromPose(poi.pose, poi.name, is_editable=False)
     self.applyChanges()
 
-    msg = "POI %s correfctly added." % req.name
+    msg = "POI %s correctly added." % req.name
     rospy.loginfo("%s::addPoiCB: %s " % (self.node_name, msg))
+    response.success = True
+    response.message = msg
+
+    return response
+
+  def addPoiJointsCB(self, req):
+    response = AddPOIJointsResponse()
+
+    if (req.environment != self.robot_environment):
+      msg = "Cannot add a POI to an environment (%s) different to active one (%s)" % (req.environment, self.robot_environment)
+      rospy.logerr("%s::addPoiJointsCB: %s" % (self.node_name, msg))
+      response.success = False
+      response.message = msg
+      return response       
+
+    poi = LabeledPose()
+    poi.name = req.name
+    poi.environment = req.environment
+    poi.frame_id = req.frame_id
+    poi.params = req.params
+    poi.pose.position.x = req.x
+    poi.pose.position.y = req.y
+    poi.pose.position.z = req.z
+    quaternion = quaternion_from_euler(req.roll, req.pitch, req.yaw)
+    poi.pose.orientation.x = quaternion[0]
+    poi.pose.orientation.y = quaternion[1]
+    poi.pose.orientation.z = quaternion[2]
+    poi.pose.orientation.w = quaternion[3]
+    poi.joints = req.joints
+
+    # AddPoi
+    response_save = self.save_poi_service(poi.name, poi.frame_id, poi.pose, poi.joints) # Should I manage if this is correctly done?
+    if (response_save[0] == False):
+      msg = response_save[1]
+      rospy.logerr("%s::addPoiJointsCB: %s" % (self.node_name, msg))
+      response.success = response_save[0]
+      response.message = msg
+      return response
+    
+    new_point = self.newPOIfromPose(poi.pose, poi.name, is_editable=False)
+    self.applyChanges()
+
+    msg = "POI %s correctly added." % req.name
+    rospy.loginfo("%s::addPoiJointsCB: %s " % (self.node_name, msg))
     response.success = True
     response.message = msg
 

@@ -16,6 +16,7 @@ add_service_files(
   FILES
   AddPOI.srv
   AddPOI_params.srv
+  AddPOIJoints.srv
   GetPOI_params.srv
   GetPOI.srv
   DeletePOI.srv

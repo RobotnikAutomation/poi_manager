@@ -570,6 +570,7 @@ class PointPathManager(InteractiveMarkerServer):
       self.erase(p.name)     
       self.applyChanges()
     self.counter_points_index = 0
+    self.delete_environment_from_poi_manager()
 
   ## @brief Callback called to delete point
   def deletePOI(self, feedback):
@@ -1039,7 +1040,7 @@ class PointPathManager(InteractiveMarkerServer):
           self.counter_points_index = self.counter_points_index - 1
           self.applyChanges()
         '''
-        self.delete_environment_from_poi_manager()
+        #self.delete_environment_from_poi_manager()
         return True,'OK'
       except:
         return False, 'Exception'

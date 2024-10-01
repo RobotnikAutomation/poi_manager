@@ -370,6 +370,7 @@ class PoiManager(RComponent):
         try:
             del (self.pose_dict['environments'][req.environment]['points'])
             del (self.pose_dict['environments'][req.environment])
+            self.pose_list = []
             yaml_file = open(self.yaml_path, 'w')
             yaml.dump(self.pose_dict, yaml_file)
             response.success = True
@@ -399,7 +400,7 @@ class PoiManager(RComponent):
         response = DeletePOIResponse()
         try:
             del (self.pose_dict['environments'][req.environment]['points'][req.name])
-
+            del (self.pose_list['environments'][req.environment]['points'][req.name])
             self.delete_empty_environment(req.environment)
             response.success = True
             response.message = "point %s from environment %s deleted" % (req.name,req.environment )

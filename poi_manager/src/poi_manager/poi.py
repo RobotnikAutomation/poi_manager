@@ -400,7 +400,13 @@ class PoiManager(RComponent):
         response = DeletePOIResponse()
         try:
             del (self.pose_dict['environments'][req.environment]['points'][req.name])
-            del (self.pose_list['environments'][req.environment]['points'][req.name])
+            if len(self.pose_list) > 0:
+                for i in self.pose_list:
+                    if i.name==req.name:
+                        self.pose_list.remove(i)
+                        # self.erase(i.name)
+                        #self.counter_points_index = self.counter_points_index - 1
+                        break
             self.delete_empty_environment(req.environment)
             response.success = True
             response.message = "point %s from environment %s deleted" % (req.name,req.environment )

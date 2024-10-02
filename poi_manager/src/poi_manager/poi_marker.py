@@ -929,6 +929,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.applyChanges()
     return resp
   
+  
   def addPoiCB(self, req):
     response = AddPOI_paramsResponse()
 

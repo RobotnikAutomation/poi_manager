@@ -39,6 +39,9 @@ catkin_install_python(PROGRAMS src/poi_manager/poi.py
 catkin_install_python(PROGRAMS src/poi_manager/poi_marker.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
+  catkin_install_python(PROGRAMS src/poi_manager/poi_manager_test.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
 
 install(
   DIRECTORY launch config

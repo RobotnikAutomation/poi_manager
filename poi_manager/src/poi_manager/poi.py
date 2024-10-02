@@ -293,6 +293,8 @@ class PoiManager(RComponent):
     def get_poi_list_cb(self, req):
         response = GetPOIsResponse()
         num = 0
+        self.parse_yaml()
+        self.process_pose_dictionary()
         if len(self.pose_list) > 0:
             for poi in self.pose_list:
                 if poi.environment == req.environment and req.environment!="":

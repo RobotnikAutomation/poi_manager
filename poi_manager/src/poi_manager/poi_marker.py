@@ -54,7 +54,7 @@ from tf import TransformListener
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 from sensor_msgs.msg import JointState
 from std_msgs.msg import ColorRGBA 
-
+from sensor_msgs.msg import NavSatFix
 
 #frame_id = 'map'
 
@@ -334,19 +334,23 @@ class PointPathManager(InteractiveMarkerServer):
     self.delete_poi_service_name = args['delete_poi_service_name']
     self.delete_all_pois_service_name = args['delete_all_pois_service_name']
     self.rlc_localization_status_topic_name = args['rlc_localization_status_topic_name']
+    self.gps_topic_name = args['gps_topic_name']
     self.node_name = rospy.get_name()
     self.initial_point = None
 
     self.robot_environment = ""
     self.joint_states_dict = {}
     self.rlc_status_time = None
+    self.gps_time = None
     self.rlc_status_msg = None
+    self.gps_msg = None
 
     self.marker_red_color = ColorRGBA(0.8,0,0, 1)
     self.marker_black_color = ColorRGBA(0,0,0,0.5)
     self.marker_green_color = ColorRGBA(0,0.7,0,0.5)
 
     self.rlc_status_timeout = 2.0
+    self.gps_timeout = 2.0
 
     self.rosSetup()
 
@@ -483,7 +487,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.appendPOI(new_point=new_point, editable=is_editable)
     return new_point
 
-  def save_poi_service(self, name, frame, pose, joints = {}):
+  def save_poi_service(self, name, frame, pose, joints, params = ""):
     if self.robot_environment == "":
       return False, "No environment selected"
     try:
@@ -499,6 +503,9 @@ class PointPathManager(InteractiveMarkerServer):
         p.joints = []
         for i in joints:
           p.joints.append(PoiJointState(name = i, position = joints[i]))
+      
+      if params != "":
+        p.params = params
 
       res = resp(p)
 
@@ -544,7 +551,18 @@ class PointPathManager(InteractiveMarkerServer):
     new_point = self.newPOIfromPose(robot_pose, name, is_editable=False)
     rospy.loginfo("%s::createNewPOIFromRobotPose: POI %s added using %s ,environment: %s" ,self.node_name, name, self.add_poi_service_name,self.robot_environment)
 
-    success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose, self.joint_states_dict)
+    # get GPS data
+    params = ""
+    #Add gps pose in params with the next format: "gps_lat: 40.0, gps_lon: -3.0"
+    current_gps_pose = self.getCurrentGPSPose()
+    #Print a message to show the gps position is available
+    rospy.loginfo("%s::addPoiCB: GPS position available: %s" % (self.node_name, current_gps_pose[1]))
+    if(current_gps_pose[0]):
+      #Print a message to show the gps position
+      rospy.loginfo("%s::addPoiCB: GPS position: %f, %f" % (self.node_name, current_gps_pose[2], current_gps_pose[3]))
+      params = "latitude: " + str(current_gps_pose[2]) + "; longitude: " + str(current_gps_pose[3])
+
+    success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose, self.joint_states_dict, params)
 
     #TODO: error feedback
     self.applyChanges()
@@ -664,6 +682,10 @@ class PointPathManager(InteractiveMarkerServer):
     self.rlc_status_time = rospy.Time.now()
     self.rlc_status_msg = msg
 
+  def gpsCb(self, msg):
+    self.gps_time = rospy.Time.now()
+    self.gps_msg = msg
+
 
   def jointStatesCb(self, msg):
     #self.joint_states = msg
@@ -685,6 +707,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.state_publisher = rospy.Publisher('~state', PoiState, queue_size=10)
     # subscribers
     self.rlc_localization_status_subscriber = rospy.Subscriber(self.rlc_localization_status_topic_name, LocalizationStatus, self.rlcLocalizationStatusCb)
+    self.gps_subscriber = rospy.Subscriber(self.gps_topic_name, NavSatFix, self.gpsCb)
     self.joint_state_subscriber = rospy.Subscriber('joint_states', JointState, self.jointStatesCb)
     # service servers
     # self.load_poi_tag_service_server = rospy.Service('~load_pois', SetBool, self.loadPoisFromServer)
@@ -824,7 +847,7 @@ class PointPathManager(InteractiveMarkerServer):
         resp.pose.orientation.z = current_pose[3][2]
         resp.pose.orientation.w = current_pose[3][3]
     return resp
-
+  
   def getCurrentPose(self):
 
     try:
@@ -835,6 +858,12 @@ class PointPathManager(InteractiveMarkerServer):
         return True, ("Transform between " + self.base_frame_id + " -> " + self.frame_id), position, quaternion
     except Exception as e:
         return False, ("Error to transform between " + self.base_frame_id + " -> " + self.frame_id + " : " + str(e)), None, None
+
+  def getCurrentGPSPose(self):
+    if self.gps_time != None and (rospy.Time.now() - self.gps_time).to_sec() < self.gps_timeout:
+      return True, "GPS position received", self.gps_msg.latitude, self.gps_msg.longitude
+    else:
+      return False, "GPS position not received", None, None
 
   def goToTagserviceCb(self, req):
     '''
@@ -950,7 +979,7 @@ class PointPathManager(InteractiveMarkerServer):
     poi.pose.orientation.x = quaternion[0]
     poi.pose.orientation.y = quaternion[1]
     poi.pose.orientation.z = quaternion[2]
-    poi.pose.orientation.w = quaternion[3]
+    poi.pose.orientation.w = quaternion[3]    
 
     # AddPoi
     response_save = self.save_poi_service(poi.name, poi.frame_id, poi.pose, self.joint_states_dict) # Should I manage if this is correctly done?
@@ -1170,7 +1199,8 @@ if __name__=="__main__":
     'add_poi_params_service_name': 'poi_manager/add_poi_by_params',
     'delete_poi_service_name': 'poi_manager/delete_poi',
     'delete_all_pois_service_name': 'poi_manager/delete_environment',
-    'rlc_localization_status_topic_name' : 'robot_local_control/LocalizationComponent/status'
+    'rlc_localization_status_topic_name' : 'robot_local_control/LocalizationComponent/status',
+    'gps_topic_name': 'gps/fix',
 	}
 
 	args = {}

@@ -487,7 +487,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.appendPOI(new_point=new_point, editable=is_editable)
     return new_point
 
-  def save_poi_service(self, name, frame, pose, joints, params = ""):
+  def save_poi_service(self, name, frame, pose, joints={}, params = ""):
     if self.robot_environment == "":
       return False, "No environment selected"
     try:

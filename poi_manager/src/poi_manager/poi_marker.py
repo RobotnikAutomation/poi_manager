@@ -553,10 +553,8 @@ class PointPathManager(InteractiveMarkerServer):
 
     # get GPS data
     params = ""
-    #Add gps pose in params with the next format: "gps_lat: 40.0, gps_lon: -3.0"
+    #Add gps pose in params with the next format: "gps_lat: 0.1532, gps_lon: -1.3213"
     current_gps_pose = self.getCurrentGPSPose()
-    #Print a message to show the gps position is available
-    rospy.loginfo("%s::addPoiCB: GPS position available: %s" % (self.node_name, current_gps_pose[1]))
     if(current_gps_pose[0]):
       #Print a message to show the gps position
       rospy.loginfo("%s::addPoiCB: GPS position: %f, %f" % (self.node_name, current_gps_pose[2], current_gps_pose[3]))
@@ -861,7 +859,12 @@ class PointPathManager(InteractiveMarkerServer):
 
   def getCurrentGPSPose(self):
     if self.gps_time != None and (rospy.Time.now() - self.gps_time).to_sec() < self.gps_timeout:
-      return True, "GPS position received", self.gps_msg.latitude, self.gps_msg.longitude
+      #Show the gps status are Status_FIX (print)
+      rospy.loginfo("%s::getCurrentGPSPose: GPS position received", self.node_name)
+      if(self.gps_msg.status.status == self.gps_msg.status.STATUS_FIX):
+        return True, "GPS position received", self.gps_msg.latitude, self.gps_msg.longitude
+      else:
+        return False, "Status GPS is not in Fix", None, None
     else:
       return False, "GPS position not received", None, None
 

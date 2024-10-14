@@ -406,7 +406,9 @@ class PointPathManager(InteractiveMarkerServer):
     if self.initial_point != None:
       self.erase(self.initial_point.name)
     self.initial_point = PointPath('POIManager', 'POIManager', frame_id = self.frame_id, is_manager=True, color = self.marker_red_color)
-    self.initial_point.pose = self.init_pose_client.getInitPose()
+    self.initial_point.pose = self.getRobotPose()
+    if self.initial_point.pose is None:
+      self.initial_point.pose = self.init_pose_client.getInitPose()
     self.insert(self.initial_point, self.initial_point.processFeedback)
     self.menu_handler.setVisible(self.h_navigation_entry, True)
     self.menu_handler.setVisible(self.h_loc_entry, True)
@@ -527,12 +529,13 @@ class PointPathManager(InteractiveMarkerServer):
 
     self.applyChanges()
 
-  def createNewPOIFromRobotPose(self, feedback, name=""):
+  ## @brief  Retrieves the current pose of the robot.
+  def getRobotPose(self):
     current_pose = self.getCurrentPose()
     robot_pose = Pose()
     if(not current_pose[0]):
-      rospy.logerror("%s::createNewPOIFromRobotPose: %s ,environment: Error: %s" ,self.node_name, self.add_poi_service_name, current_pose[1])
-      return
+      rospy.logerror("%s::getRobotPose: Error: %s" ,self.node_name, current_pose[1])
+      return None
     robot_pose.position.x = current_pose[2][0]
     robot_pose.position.y = current_pose[2][1]
     robot_pose.position.z = 0.2
@@ -540,6 +543,13 @@ class PointPathManager(InteractiveMarkerServer):
     robot_pose.orientation.y = current_pose[3][1]
     robot_pose.orientation.z = current_pose[3][2]
     robot_pose.orientation.w = current_pose[3][3]
+    return robot_pose
+
+  def createNewPOIFromRobotPose(self, feedback, name=""):
+    robot_pose = self.getRobotPose()
+    if robot_pose is None:
+      rospy.logerror("%s::createNewPOIFromRobotPose: %s ,environment: Error: creating poi" ,self.node_name, self.add_poi_service_name)
+      return
     if (name==""):
       name = 'p%d'%(self.counter_points_index)
     new_point = self.newPOIfromPose(robot_pose, name, is_editable=False)

@@ -419,6 +419,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.menu_handler.setVisible(self.entry_new_from_robot_pose, True)
     self.menu_handler.apply( self, self.initial_point.name )
     self.applyChanges()
+    rospy.sleep(1)
 
     resp = self.loadPoisFromServer()
     if resp[0] == False:
@@ -568,8 +569,8 @@ class PointPathManager(InteractiveMarkerServer):
     for i in range(0,len(self.list_of_points)):
       p=self.list_of_points.pop()
       self.erase(p.name)     
-      self.applyChanges()
     self.counter_points_index = 0
+    self.applyChanges()
 
   ## @brief Method to delete all POIs
   def deleteAllPOIs(self):
@@ -1040,13 +1041,6 @@ class PointPathManager(InteractiveMarkerServer):
       try:
         rospy.loginfo("%s::serviceDeleteAllPOIs %d",self.node_name,len(self.list_of_points))
         self.deleteAllPOIs()
-        '''for i in range(0,len(self.list_of_points)):
-          p=self.list_of_points.pop()
-          self.erase(p.name)
-          self.counter_points_index = self.counter_points_index - 1
-          self.applyChanges()
-        '''
-        #self.delete_environment_from_poi_manager()
         return True,'OK'
       except:
         return False, 'Exception'

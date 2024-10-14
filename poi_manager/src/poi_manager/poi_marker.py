@@ -397,7 +397,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.menu_handler.apply( self, self.initial_point.name )
     self.applyChanges()
 
-    self.deleteAllPOIs()
+    self.deleteAllMarkers()
 
   def enableManager(self):
     '''

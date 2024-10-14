@@ -562,14 +562,19 @@ class PointPathManager(InteractiveMarkerServer):
 
     self.deleteAllPOIs()
 
-  ## @brief Method to delete all POIs
-  def deleteAllPOIs(self):
-    rospy.loginfo("%s::deleteAllPOIs %d",rospy.get_name(), len(self.list_of_points))
+  ## @brief Method to delete all POI Markers
+  def deleteAllMarkers(self):
+    rospy.loginfo("%s::deleteAllMarkers %d",rospy.get_name(), len(self.list_of_points))
     for i in range(0,len(self.list_of_points)):
       p=self.list_of_points.pop()
       self.erase(p.name)     
       self.applyChanges()
     self.counter_points_index = 0
+
+  ## @brief Method to delete all POIs
+  def deleteAllPOIs(self):
+    rospy.loginfo("%s::deleteAllPOIs %d",rospy.get_name(), len(self.list_of_points))
+    self.deleteAllMarkers()
     self.delete_environment_from_poi_manager()
 
   ## @brief Callback called to delete point
@@ -1117,8 +1122,8 @@ class PointPathManager(InteractiveMarkerServer):
             rospy.logerr("%s::loadPoisFromServer: Service call failed: %s",self.node_name,e)
             return False,'Exception'
 
-      # Deletes the current list of points
-      self.deleteAllPOIs()
+      # Deletes the current list of marker points
+      self.deleteAllMarkers()
       # Looks for the index used when creating pois
       max_index = 0
       #create	the POis

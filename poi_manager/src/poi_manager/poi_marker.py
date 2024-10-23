@@ -325,6 +325,7 @@ class PointPathManager(InteractiveMarkerServer):
     self.counter_points_index = 0
     self.init_pose_topic_name = args['init_pose_topic_name']
     self.goto_planner_action_name = args['goto_planner']
+    self.rms_manager_action_name = args['rms_manager_action_name']
     self.command_manager_action_name = args['command_manager_action_name']
     self.use_rlc_goto = args['use_rlc_goto']
     self.load_pois_service_name = args['load_pois_service_name']
@@ -730,7 +731,9 @@ class PointPathManager(InteractiveMarkerServer):
     if self.use_rlc_goto:
       planner = self.command_manager_action_name
     else:
-      planner = self.goto_planner_action_name
+      #planner = self.goto_planner_action_name 
+      planner = self.rms_manager_action_name
+
     self.planner_client = MoveBaseClient(planner_name=planner, use_rlc_goto=self.use_rlc_goto)
 
     self.init_pose_client = InitPoseClient(self.init_pose_topic_name)
@@ -1172,8 +1175,9 @@ if __name__=="__main__":
     'base_frame_id': 'robot_base_footprint',
     'frame_id': 'robot_map',
     'goto_planner': 'mb_avoidance/move_base',
+    'rms_manager_action_name': 'rms/action',
     'use_rlc_goto': False,
-    'command_manager_action_name': 'command_manager',
+    'command_manager_action_name': 'command_manager/action', #rms
     'init_pose_topic_name': 'initialpose',
     'load_pois_service_name': 'poi_manager/get_poi_list',
     'get_poi_service_name': 'poi_manager/get_poi',
@@ -1200,9 +1204,8 @@ if __name__=="__main__":
 	server = PointPathManager(_name, args)
 	t_sleep = 0.5
 	running = True
-
+  
 	while not rospy.is_shutdown() and running:
-
 		try:
 			rospy.sleep(t_sleep)
 			server.controlLoop()

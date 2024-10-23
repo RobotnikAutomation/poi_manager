@@ -293,6 +293,8 @@ class PoiManager(RComponent):
     def get_poi_list_cb(self, req):
         response = GetPOIsResponse()
         num = 0
+        self.parse_yaml()
+        self.process_pose_dictionary()
         if len(self.pose_list) > 0:
             for poi in self.pose_list:
                 if poi.environment == req.environment and req.environment!="":
@@ -370,6 +372,7 @@ class PoiManager(RComponent):
         try:
             del (self.pose_dict['environments'][req.environment]['points'])
             del (self.pose_dict['environments'][req.environment])
+            self.pose_list = []
             yaml_file = open(self.yaml_path, 'w')
             yaml.dump(self.pose_dict, yaml_file)
             response.success = True
@@ -399,7 +402,13 @@ class PoiManager(RComponent):
         response = DeletePOIResponse()
         try:
             del (self.pose_dict['environments'][req.environment]['points'][req.name])
-
+            if len(self.pose_list) > 0:
+                for i in self.pose_list:
+                    if i.name==req.name:
+                        self.pose_list.remove(i)
+                        # self.erase(i.name)
+                        #self.counter_points_index = self.counter_points_index - 1
+                        break
             self.delete_empty_environment(req.environment)
             response.success = True
             response.message = "point %s from environment %s deleted" % (req.name,req.environment )

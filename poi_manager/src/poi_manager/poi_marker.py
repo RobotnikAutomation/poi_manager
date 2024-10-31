@@ -100,7 +100,7 @@ class MoveBaseClient():
 			y = goal_pose.pose.position.y
 			angles = euler_from_quaternion([goal_pose.pose.orientation.x, goal_pose.pose.orientation.y, goal_pose.pose.orientation.z, goal_pose.pose.orientation.w])
 			theta = angles[2]
-			command = " ".join(['RLC_GOTO', str(x), str(y), str(theta)])
+			command = " ".join(['GOTO', str(x), str(y), str(theta)])
 			goal.command.command = command
 			self.client.send_goal(goal)
 			return 0

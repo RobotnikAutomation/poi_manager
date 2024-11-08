@@ -88,23 +88,25 @@ class MoveBaseClient():
       timeout = 3
     else:
       timeout = rospy.Duration(3.0)
+      # timeout = 3
     # Waits until the action server has started up and started
     # listening for goals.
     if self.client.wait_for_server(timeout):
       goal = self.goal_msg()
       #set goal
-      # if not self.use_rlc_goto:
-      # 	goal.target_pose = goal_pose
-      # else:
-      x = goal_pose.pose.position.x
-      y = goal_pose.pose.position.y
-      angles = euler_from_quaternion([goal_pose.pose.orientation.x, goal_pose.pose.orientation.y, goal_pose.pose.orientation.z, goal_pose.pose.orientation.w])
-      theta = angles[2]
       if not self.use_rlc_goto:
-        command = " ".join(['GOTO', str(x), str(y), str(theta)])
+         goal.target_pose = goal_pose
       else:
-        command = " ".join(['RLC_GOTO', str(x), str(y), str(theta)])
-      goal.command.command = command
+        x = goal_pose.pose.position.x
+        y = goal_pose.pose.position.y
+        angles = euler_from_quaternion([goal_pose.pose.orientation.x, goal_pose.pose.orientation.y, goal_pose.pose.orientation.z, goal_pose.pose.orientation.w])
+        theta = angles[2]
+        # if not self.use_rlc_goto:
+        command = " ".join(['GOTO', str(x), str(y), str(theta)])
+        # else:
+        #command = " ".join(['RLC_GOTO', str(x), str(y), str(theta)])
+        goal.command.command = command
+        rospy.loginfo('%s::MoveBaseClient:goTo: sending command %s', rospy.get_name(), command)
       self.client.send_goal(goal)
       return 0
     else:
@@ -730,14 +732,15 @@ class PointPathManager(InteractiveMarkerServer):
 
     self.tf_transform_listener = TransformListener()
 
-    # self.use_rlc_goto = True
+    self.use_rlc_goto = True
     # Action clients
     if self.use_rlc_goto:
       # planner = self.command_manager_action_name
-      planner = self.goto_planner_action_name 
-    else:
-      # planner = self.goto_planner_action_name 
       planner = self.rms_manager_action_name
+      # planner = self.goto_planner_action_name 
+    else:
+      planner = self.goto_planner_action_name 
+      # planner = self.rms_manager_action_name
     rospy.logwarn('%s::rosSetup: planner %s , rlc_goto:: %s',rospy.get_name(), planner , self.use_rlc_goto)
     self.planner_client = MoveBaseClient(planner_name=planner, use_rlc_goto=self.use_rlc_goto)
 

@@ -39,6 +39,7 @@ from visualization_msgs.msg import InteractiveMarker, Marker, InteractiveMarkerC
 from interactive_markers.menu_handler import *
 from robot_simple_command_sequencer.command_manager_interface import CommandManagerInterface
 from robot_simple_command_manager_msgs.msg import RobotSimpleCommandGoal
+from robot_simple_command_manager_msgs.msg import RobotSimpleCommandAction
 
 import actionlib
 from actionlib_msgs.msg import GoalStatus, GoalID
@@ -68,8 +69,9 @@ class MoveBaseClient():
     # Creates the SimpleActionClient, passing the type of the action
     # (GoTo) to the constructor.
     if self.use_rlc_goto:
-      self.client = CommandManagerInterface(self.planner_name, 10)
+      # self.client = CommandManagerInterface(self.planner_name, 10)
       self.goal_msg = RobotSimpleCommandGoal
+      self.client = actionlib.SimpleActionClient(self.planner_name, RobotSimpleCommandAction)
     else:
       pkg, name, _ = self._getModuleAndName(self.planner_name + '/goal')
       pkg_goal = "".join(pkg.split('Action'))
@@ -85,7 +87,8 @@ class MoveBaseClient():
   ## @return 0 if OK, -1 if no server, -2 if it's tracking a goal at the moment
   def goTo(self, goal_pose):
     if self.use_rlc_goto:
-      timeout = 3
+      # timeout = 3.0
+      timeout = rospy.Duration(3.0)
     else:
       timeout = rospy.Duration(3.0)
       # timeout = 3
@@ -119,7 +122,7 @@ class MoveBaseClient():
     if not self.use_rlc_goto:
       self.client.cancel_goal()
     else:
-      self.client.cancel()
+      self.client.cancel_goal()
 
   ## @brief Get the state information for this goal
     ##
@@ -732,12 +735,10 @@ class PointPathManager(InteractiveMarkerServer):
 
     self.tf_transform_listener = TransformListener()
 
-    self.use_rlc_goto = True
     # Action clients
     if self.use_rlc_goto:
       # planner = self.command_manager_action_name
-      planner = self.rms_manager_action_name
-      # planner = self.goto_planner_action_name 
+      planner = self.rms_manager_action_name 
     else:
       planner = self.goto_planner_action_name 
       # planner = self.rms_manager_action_name

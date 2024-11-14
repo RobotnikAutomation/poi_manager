@@ -63,19 +63,19 @@ from std_msgs.msg import ColorRGBA
 # Client based on ActionServer to send goals to the purepursuit node
 class MoveBaseClient():
 
-  def __init__(self, planner_name, use_rms_goto=False, use_rlc_goto = False):
+  def __init__(self, planner_name, use_rms_goto=False, use_command_manager_goto = False):
     self.planner_name = planner_name
-    self.use_rlc_goto = use_rlc_goto
+    self.use_command_manager_goto = use_command_manager_goto
     self.use_rms_goto = use_rms_goto
     # Creates the SimpleActionClient, passing the type of the action
     # (GoTo) to the constructor.
-    if self.use_rlc_goto:
-      self.goal_msg = RobotSimpleCommandGoal
-      self.client = CommandManagerInterface(self.planner_name, 10)
-    elif self.use_rms_goto:
+    if self.use_rms_goto:
       # self.client = CommandManagerInterface(self.planner_name, 10)
       self.goal_msg = RobotSimpleCommandGoal
       self.client = actionlib.SimpleActionClient(self.planner_name, RobotSimpleCommandAction)
+    elif self.use_command_manager_goto:
+      self.goal_msg = RobotSimpleCommandGoal
+      self.client = CommandManagerInterface(self.planner_name, 10)
     else:
       pkg, name, _ = self._getModuleAndName(self.planner_name + '/goal')
       pkg_goal = "".join(pkg.split('Action'))
@@ -90,7 +90,7 @@ class MoveBaseClient():
   ## @param goal_pose as geometry_msgs/PoseStamped
   ## @return 0 if OK, -1 if no server, -2 if it's tracking a goal at the moment
   def goTo(self, goal_pose):
-    if self.use_rlc_goto:
+    if self.use_command_manager_goto:
       timeout = 3.0
       # timeout = rospy.Duration(3.0)
     else:
@@ -101,7 +101,7 @@ class MoveBaseClient():
     if self.client.wait_for_server(timeout):
       goal = self.goal_msg()
       #set goal
-      if (not self.use_rlc_goto) and (not self.use_rms_goto):
+      if (not self.use_command_manager_goto) and (not self.use_rms_goto):
          rospy.logwarn('%s::MoveBaseClient:goTo: entered sending goal %s', rospy.get_name(), goal_pose)
          goal.target_pose = goal_pose
       else:
@@ -112,7 +112,7 @@ class MoveBaseClient():
         if self.use_rms_goto:
           command = " ".join(['GOTO', str(x), str(y), str(theta)])
         else:
-          command = " ".join(['RLC_GOTO', str(x), str(y), str(theta)])
+          command = " ".join([self.command_manager_goto_command, str(x), str(y), str(theta)])
         goal.command.command = command
         rospy.loginfo('%s::MoveBaseClient:goTo: sending command %s', rospy.get_name(), command)
       self.client.send_goal(goal)
@@ -124,7 +124,7 @@ class MoveBaseClient():
   ## @brief cancel the current goal
   def cancel(self):
     rospy.logwarn('%s::MoveBaseClient:cancel: cancelling the goal', rospy.get_name())
-    if not self.use_rlc_goto:
+    if not self.use_command_manager_goto:
       self.client.cancel_goal()
     else:
       self.client.cancel()
@@ -340,8 +340,9 @@ class PointPathManager(InteractiveMarkerServer):
     self.goto_planner_action_name = args['goto_planner']
     self.rms_manager_action_name = args['rms_manager_action_name']
     self.command_manager_action_name = args['command_manager_action_name']
-    self.use_rlc_goto = args['use_rlc_goto']
+    self.use_command_manager_goto = args['use_command_manager_goto']
     self.use_rms_goto = args['use_rms_goto']
+    self.command_manager_goto_command = args['command_manager_goto_command']
     self.load_pois_service_name = args['load_pois_service_name']
     self.get_poi_service_name = args['get_poi_service_name']
     self.add_poi_service_name = args['add_poi_service_name']
@@ -742,16 +743,17 @@ class PointPathManager(InteractiveMarkerServer):
     self.tf_transform_listener = TransformListener()
 
     # Action clients
-    if self.use_rlc_goto:
-      planner = self.command_manager_action_name
-    elif self.use_rms_goto:
+    if self.use_rms_goto:
       # planner = self.command_manager_action_name
-      planner = self.rms_manager_action_name 
+      planner = self.rms_manager_action_name
+    elif self.use_command_manager_goto:
+      planner = self.command_manager_action_name
+      # planner = self.rms_manager_action_name 
     else:
       planner = self.goto_planner_action_name 
       # planner = self.rms_manager_action_name
-    rospy.logwarn('%s::rosSetup: planner %s , rlc_goto:: %s',rospy.get_name(), planner , self.use_rlc_goto)
-    self.planner_client = MoveBaseClient(planner_name=planner, use_rms_goto=self.use_rms_goto, use_rlc_goto=self.use_rlc_goto)
+    rospy.logwarn('%s::rosSetup: planner %s , rlc_goto:: %s',rospy.get_name(), planner , self.use_command_manager_goto)
+    self.planner_client = MoveBaseClient(planner_name=planner, use_rms_goto=self.use_rms_goto, use_command_manager_goto=self.use_command_manager_goto)
 
     self.init_pose_client = InitPoseClient(self.init_pose_topic_name)
     self._state = PoiState()
@@ -1192,7 +1194,7 @@ if __name__=="__main__":
     'base_frame_id': 'robot_base_footprint',
     'frame_id': 'robot_map',
     'goto_planner': 'mb_avoidance/move_base',
-    'use_rlc_goto': False,
+    'use_command_manager_goto': False,
     'use_rms_goto': False,
     'rms_manager_action_name' : 'rms/action',
     'command_manager_action_name': 'command_manager/action', #rms
@@ -1203,7 +1205,8 @@ if __name__=="__main__":
     'add_poi_params_service_name': 'poi_manager/add_poi_by_params',
     'delete_poi_service_name': 'poi_manager/delete_poi',
     'delete_all_pois_service_name': 'poi_manager/delete_environment',
-    'rlc_localization_status_topic_name' : 'robot_local_control/LocalizationComponent/status'
+    'rlc_localization_status_topic_name' : 'robot_local_control/LocalizationComponent/status',
+    'command_manager_goto_command' : 'GOTO'
   }
 
   args = {}

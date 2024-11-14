@@ -1,6 +1,7 @@
-# use_rlc_goto: true
+use_command_manager_goto: true
 # frame_id: robot_map
 # goto_planner: move_base
+command_manager_goto_command: 'GOTO'
 use_rms_goto: false
 base_frame_id: robot_base_footprint
 rms_manager_action_name : rms/action

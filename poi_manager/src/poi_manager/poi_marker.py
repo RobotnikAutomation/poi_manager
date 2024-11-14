@@ -63,10 +63,11 @@ from std_msgs.msg import ColorRGBA
 # Client based on ActionServer to send goals to the purepursuit node
 class MoveBaseClient():
 
-  def __init__(self, planner_name, use_rms_goto=False, use_command_manager_goto = False):
+  def __init__(self, planner_name, use_rms_goto=False, use_command_manager_goto = False, command_manager_goto_command='GOTO'):
     self.planner_name = planner_name
     self.use_command_manager_goto = use_command_manager_goto
     self.use_rms_goto = use_rms_goto
+    self.command_manager_goto_command = command_manager_goto_command
     # Creates the SimpleActionClient, passing the type of the action
     # (GoTo) to the constructor.
     if self.use_rms_goto:
@@ -753,7 +754,7 @@ class PointPathManager(InteractiveMarkerServer):
       planner = self.goto_planner_action_name 
       # planner = self.rms_manager_action_name
     rospy.logwarn('%s::rosSetup: planner %s , rlc_goto:: %s',rospy.get_name(), planner , self.use_command_manager_goto)
-    self.planner_client = MoveBaseClient(planner_name=planner, use_rms_goto=self.use_rms_goto, use_command_manager_goto=self.use_command_manager_goto)
+    self.planner_client = MoveBaseClient(planner_name=planner, use_rms_goto=self.use_rms_goto, use_command_manager_goto=self.use_command_manager_goto, command_manager_goto_command=self.command_manager_goto_command)
 
     self.init_pose_client = InitPoseClient(self.init_pose_topic_name)
     self._state = PoiState()

@@ -1,0 +1,16 @@
+use_command_manager_goto: false
+# frame_id: robot_map
+# goto_planner: move_base
+command_manager_goto_command: GOTO
+use_rms_goto: true
+base_frame_id: robot_base_footprint
+rms_manager_action_name : rms/action
+command_manager_action_name: command_manager #rms
+init_pose_topic_name: initialpose
+load_pois_service_name: poi_manager/get_poi_list
+get_poi_service_name: poi_manager/get_poi
+add_poi_service_name: poi_manager/add_poi
+add_poi_params_service_name: poi_manager/add_poi_by_params
+delete_poi_service_name: poi_manager/delete_poi
+delete_all_pois_service_name: poi_manager/delete_environment
+rlc_localization_status_topic_name : robot_local_control/LocalizationComponent/status

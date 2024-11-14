@@ -39,6 +39,7 @@ from visualization_msgs.msg import InteractiveMarker, Marker, InteractiveMarkerC
 from interactive_markers.menu_handler import *
 from robot_simple_command_sequencer.command_manager_interface import CommandManagerInterface
 from robot_simple_command_manager_msgs.msg import RobotSimpleCommandGoal
+from robot_simple_command_manager_msgs.msg import RobotSimpleCommandAction
 
 import actionlib
 from actionlib_msgs.msg import GoalStatus, GoalID
@@ -62,120 +63,133 @@ from std_msgs.msg import ColorRGBA
 # Client based on ActionServer to send goals to the purepursuit node
 class MoveBaseClient():
 
-	def __init__(self, planner_name, use_rlc_goto = False):
-		self.planner_name = planner_name
-		self.use_rlc_goto = use_rlc_goto
-		# Creates the SimpleActionClient, passing the type of the action
-		# (GoTo) to the constructor.
-		if self.use_rlc_goto:
-			self.client = CommandManagerInterface(self.planner_name, 10)
-			self.goal_msg = RobotSimpleCommandGoal
-		else:
-			pkg, name, _ = self._getModuleAndName(self.planner_name + '/goal')
-			pkg_goal = "".join(pkg.split('Action'))
-			name_goal = "".join(name.split('Action'))
-			self.goal_msg = self._importModule(pkg_goal, name_goal)
-			pkg_action = "".join(pkg.split('Goal'))
-			name_action = "".join(name.split('Goal'))
-			action_msg = self._importModule(pkg_action, name_action)	
-			self.client = actionlib.SimpleActionClient(self.planner_name, action_msg)
+  def __init__(self, planner_name, use_rms_goto=False, use_command_manager_goto = False, command_manager_goto_command='GOTO'):
+    self.planner_name = planner_name
+    self.use_command_manager_goto = use_command_manager_goto
+    self.use_rms_goto = use_rms_goto
+    self.command_manager_goto_command = command_manager_goto_command
+    # Creates the SimpleActionClient, passing the type of the action
+    # (GoTo) to the constructor.
+    if self.use_rms_goto:
+      # self.client = CommandManagerInterface(self.planner_name, 10)
+      self.goal_msg = RobotSimpleCommandGoal
+      self.client = actionlib.SimpleActionClient(self.planner_name, RobotSimpleCommandAction)
+    elif self.use_command_manager_goto:
+      self.goal_msg = RobotSimpleCommandGoal
+      self.client = CommandManagerInterface(self.planner_name, 10)
+    else:
+      pkg, name, _ = self._getModuleAndName(self.planner_name + '/goal')
+      pkg_goal = "".join(pkg.split('Action'))
+      name_goal = "".join(name.split('Action'))
+      self.goal_msg = self._importModule(pkg_goal, name_goal)
+      pkg_action = "".join(pkg.split('Goal'))
+      name_action = "".join(name.split('Goal'))
+      action_msg = self._importModule(pkg_action, name_action)	
+      self.client = actionlib.SimpleActionClient(self.planner_name, action_msg)
 
-	## @brief Sends the goal to
-	## @param goal_pose as geometry_msgs/PoseStamped
-	## @return 0 if OK, -1 if no server, -2 if it's tracking a goal at the moment
-	def goTo(self, goal_pose):
-		if self.use_rlc_goto:
-			timeout = 3
-		else:
-			timeout = rospy.Duration(3.0)
-		# Waits until the action server has started up and started
-		# listening for goals.
-		if self.client.wait_for_server(timeout):
-			goal = self.goal_msg()
-			#set goal
-			if not self.use_rlc_goto:
-				goal.target_pose = goal_pose
-			else:
-				x = goal_pose.pose.position.x
-				y = goal_pose.pose.position.y
-				angles = euler_from_quaternion([goal_pose.pose.orientation.x, goal_pose.pose.orientation.y, goal_pose.pose.orientation.z, goal_pose.pose.orientation.w])
-				theta = angles[2]
-				command = " ".join(['RLC_GOTO', str(x), str(y), str(theta)])
-				goal.command.command = command
-			self.client.send_goal(goal)
-			return 0
-		else:
-			rospy.logerr('%s::MoveBaseClient:goTo: Error waiting for server %s', rospy.get_name(), self.planner_name)
-			return -1
+  ## @brief Sends the goal to
+  ## @param goal_pose as geometry_msgs/PoseStamped
+  ## @return 0 if OK, -1 if no server, -2 if it's tracking a goal at the moment
+  def goTo(self, goal_pose):
+    if self.use_command_manager_goto:
+      timeout = 3.0
+      # timeout = rospy.Duration(3.0)
+    else:
+      timeout = rospy.Duration(3.0)
+      # timeout = 3
+    # Waits until the action server has started up and started
+    # listening for goals.
+    if self.client.wait_for_server(timeout):
+      goal = self.goal_msg()
+      #set goal
+      if (not self.use_command_manager_goto) and (not self.use_rms_goto):
+         rospy.logwarn('%s::MoveBaseClient:goTo: entered sending goal %s', rospy.get_name(), goal_pose)
+         goal.target_pose = goal_pose
+      else:
+        x = goal_pose.pose.position.x
+        y = goal_pose.pose.position.y
+        angles = euler_from_quaternion([goal_pose.pose.orientation.x, goal_pose.pose.orientation.y, goal_pose.pose.orientation.z, goal_pose.pose.orientation.w])
+        theta = angles[2]
+        if self.use_rms_goto:
+          command = " ".join(['GOTO', str(x), str(y), str(theta)])
+        else:
+          command = " ".join([self.command_manager_goto_command, str(x), str(y), str(theta)])
+        goal.command.command = command
+        rospy.loginfo('%s::MoveBaseClient:goTo: sending command %s', rospy.get_name(), command)
+      self.client.send_goal(goal)
+      return 0
+    else:
+      rospy.logerr('%s::MoveBaseClient:goTo: Error waiting for server %s', rospy.get_name(), self.planner_name)
+      return -1
 
-	## @brief cancel the current goal
-	def cancel(self):
-		rospy.logwarn('%s::MoveBaseClient:cancel: cancelling the goal', rospy.get_name())
-		if not self.use_rlc_goto:
-			self.client.cancel_goal()
-		else:
-			self.client.cancel()
+  ## @brief cancel the current goal
+  def cancel(self):
+    rospy.logwarn('%s::MoveBaseClient:cancel: cancelling the goal', rospy.get_name())
+    if not self.use_command_manager_goto:
+      self.client.cancel_goal()
+    else:
+      self.client.cancel()
 
-	## @brief Get the state information for this goal
-		##
-		## Possible States Are: PENDING, ACTIVE, RECALLED, REJECTED,
-		## PREEMPTED, ABORTED, SUCCEEDED, LOST.
-		##
-		## @return The goal's state. Returns LOST if this
-		## SimpleActionClient isn't tracking a goal.
-	def getState(self):
-		return self.client.get_state()
+  ## @brief Get the state information for this goal
+    ##
+    ## Possible States Are: PENDING, ACTIVE, RECALLED, REJECTED,
+    ## PREEMPTED, ABORTED, SUCCEEDED, LOST.
+    ##
+    ## @return The goal's state. Returns LOST if this
+    ## SimpleActionClient isn't tracking a goal.
+  def getState(self):
+    return self.client.get_state()
 
-	## @brief Returns ret if OK, otherwise -1
-	def getResult(self):
-		ret = self.client.get_result()
-		if not ret:
-			return -1
+  ## @brief Returns ret if OK, otherwise -1
+  def getResult(self):
+    ret = self.client.get_result()
+    if not ret:
+      return -1
 
-		else:
-			return ret
-	def wait(self):
-		return self.client.wait_for_result()
+    else:
+      return ret
+  def wait(self):
+    return self.client.wait_for_result()
 
-	def _getModuleAndName(self, topic):
-		namespace = rospy.get_namespace()
-		if not topic[0] == '/':
-			topic = namespace + topic
-		msg_type, topic, _ = rostopic.get_topic_class(topic)
-		#module = '.'.join(msg_type.__module__.split('.')[:-1])
-		module = msg_type.__module__
-		name = msg_type.__name__
-		return module, name, msg_type
-	
-	def _importModule(self, pkg, name):
-		# module_import_name = '.'.join([pkg, name])
-		module_import_name = pkg
-		module = importlib.import_module(module_import_name)
-		object_type = getattr(module, name)
-		return object_type
+  def _getModuleAndName(self, topic):
+    namespace = rospy.get_namespace()
+    if not topic[0] == '/':
+      topic = namespace + topic
+    msg_type, topic, _ = rostopic.get_topic_class(topic)
+    #module = '.'.join(msg_type.__module__.split('.')[:-1])
+    module = msg_type.__module__
+    name = msg_type.__name__
+    return module, name, msg_type
+  
+  def _importModule(self, pkg, name):
+    # module_import_name = '.'.join([pkg, name])
+    module_import_name = pkg
+    module = importlib.import_module(module_import_name)
+    object_type = getattr(module, name)
+    return object_type
 
 # Client based on ActionServer to send goals to the purepursuit node
 class InitPoseClient():
 
-	def __init__(self, topic_name):
-		self.topic_name = topic_name
-		# Creates a ROS publisher
-		self.client = rospy.Publisher(topic_name, PoseWithCovarianceStamped, queue_size=10)
-		# Init variable to store init pose
-		self.init_pose = Pose()
+  def __init__(self, topic_name):
+    self.topic_name = topic_name
+    # Creates a ROS publisher
+    self.client = rospy.Publisher(topic_name, PoseWithCovarianceStamped, queue_size=10)
+    # Init variable to store init pose
+    self.init_pose = Pose()
 
-	## @brief Sends the pose
-	## @param goal_pose as geometry_msgs/PoseStamped
-	## @return 0 if OK, -1 if no server, -2 if it's tracking a goal at the moment
-	def setPose(self, pose):
-		self.init_pose = pose.pose.pose
-		rospy.loginfo('%s::InitPoseClient:setPose: setting pose', rospy.get_name())
-		self.client.publish(pose)
+  ## @brief Sends the pose
+  ## @param goal_pose as geometry_msgs/PoseStamped
+  ## @return 0 if OK, -1 if no server, -2 if it's tracking a goal at the moment
+  def setPose(self, pose):
+    self.init_pose = pose.pose.pose
+    rospy.loginfo('%s::InitPoseClient:setPose: setting pose', rospy.get_name())
+    self.client.publish(pose)
 
-		return
+    return
 
-	def getInitPose(self):
-		return self.init_pose
+  def getInitPose(self):
+    return self.init_pose
 
 
 class PointPath(InteractiveMarker):
@@ -246,7 +260,7 @@ class PointPath(InteractiveMarker):
             control.orientation.y = 1
             control.orientation.z = 0
         elif is_editable:
-    		#arrow color
+        #arrow color
           self.marker.color.r = 0.8
           self.marker.color.g = 0.8
           self.marker.color.b = 0.0
@@ -325,8 +339,11 @@ class PointPathManager(InteractiveMarkerServer):
     self.counter_points_index = 0
     self.init_pose_topic_name = args['init_pose_topic_name']
     self.goto_planner_action_name = args['goto_planner']
+    self.rms_manager_action_name = args['rms_manager_action_name']
     self.command_manager_action_name = args['command_manager_action_name']
-    self.use_rlc_goto = args['use_rlc_goto']
+    self.use_command_manager_goto = args['use_command_manager_goto']
+    self.use_rms_goto = args['use_rms_goto']
+    self.command_manager_goto_command = args['command_manager_goto_command']
     self.load_pois_service_name = args['load_pois_service_name']
     self.get_poi_service_name = args['get_poi_service_name']
     self.add_poi_service_name = args['add_poi_service_name']
@@ -727,11 +744,17 @@ class PointPathManager(InteractiveMarkerServer):
     self.tf_transform_listener = TransformListener()
 
     # Action clients
-    if self.use_rlc_goto:
+    if self.use_rms_goto:
+      # planner = self.command_manager_action_name
+      planner = self.rms_manager_action_name
+    elif self.use_command_manager_goto:
       planner = self.command_manager_action_name
+      # planner = self.rms_manager_action_name 
     else:
-      planner = self.goto_planner_action_name
-    self.planner_client = MoveBaseClient(planner_name=planner, use_rlc_goto=self.use_rlc_goto)
+      planner = self.goto_planner_action_name 
+      # planner = self.rms_manager_action_name
+    rospy.logwarn('%s::rosSetup: planner %s , rlc_goto:: %s',rospy.get_name(), planner , self.use_command_manager_goto)
+    self.planner_client = MoveBaseClient(planner_name=planner, use_rms_goto=self.use_rms_goto, use_command_manager_goto=self.use_command_manager_goto, command_manager_goto_command=self.command_manager_goto_command)
 
     self.init_pose_client = InitPoseClient(self.init_pose_topic_name)
     self._state = PoiState()
@@ -1164,16 +1187,18 @@ class PointPathManager(InteractiveMarkerServer):
 
 
 if __name__=="__main__":
-	rospy.init_node("poi_markers")
+  rospy.init_node("poi_markers")
 
-	_name = rospy.get_name().replace('/','')
+  _name = rospy.get_name().replace('/','')
 
-	arg_defaults = {
+  arg_defaults = {
     'base_frame_id': 'robot_base_footprint',
     'frame_id': 'robot_map',
     'goto_planner': 'mb_avoidance/move_base',
-    'use_rlc_goto': False,
-    'command_manager_action_name': 'command_manager',
+    'use_command_manager_goto': False,
+    'use_rms_goto': False,
+    'rms_manager_action_name' : 'rms/action',
+    'command_manager_action_name': 'command_manager/action', #rms
     'init_pose_topic_name': 'initialpose',
     'load_pois_service_name': 'poi_manager/get_poi_list',
     'get_poi_service_name': 'poi_manager/get_poi',
@@ -1181,31 +1206,31 @@ if __name__=="__main__":
     'add_poi_params_service_name': 'poi_manager/add_poi_by_params',
     'delete_poi_service_name': 'poi_manager/delete_poi',
     'delete_all_pois_service_name': 'poi_manager/delete_environment',
-    'rlc_localization_status_topic_name' : 'robot_local_control/LocalizationComponent/status'
-	}
+    'rlc_localization_status_topic_name' : 'robot_local_control/LocalizationComponent/status',
+    'command_manager_goto_command' : 'GOTO'
+  }
 
-	args = {}
+  args = {}
 
-	for name in arg_defaults:
-		try:
-			if rospy.search_param(name):
-				args[name] = rospy.get_param('~'+name) # Adding the name of the node, because the para has the namespace of the node
-			else:
-				args[name] = arg_defaults[name]
-			#print name
-		except rospy.ROSException as e:
-			rospy.logerror('%s: %s'%(e, _name))
-	#frame_id = args['frame_id']
-	#TODO: the object should get the args dict and set them in the init, not this way
-	server = PointPathManager(_name, args)
-	t_sleep = 0.5
-	running = True
-
-	while not rospy.is_shutdown() and running:
-
-		try:
-			rospy.sleep(t_sleep)
-			server.controlLoop()
-		except rospy.exceptions.ROSInterruptException:
-			rospy.loginfo('Main: ROS interrupt exception')
-			running = False
+  for name in arg_defaults:
+    try:
+      if rospy.search_param(name):
+        args[name] = rospy.get_param('~'+name) # Adding the name of the node, because the para has the namespace of the node
+      else:
+        args[name] = arg_defaults[name]
+      #print name
+    except rospy.ROSException as e:
+      rospy.logerror('%s: %s'%(e, _name))
+  #frame_id = args['frame_id']
+  #TODO: the object should get the args dict and set them in the init, not this way
+  server = PointPathManager(_name, args)
+  t_sleep = 0.5
+  running = True
+  
+  while not rospy.is_shutdown() and running:
+    try:
+      rospy.sleep(t_sleep)
+      server.controlLoop()
+    except rospy.exceptions.ROSInterruptException:
+      rospy.loginfo('Main: ROS interrupt exception')
+      running = False

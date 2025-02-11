@@ -539,8 +539,10 @@ class PointPathManager(InteractiveMarkerServer):
 
 
     rospy.loginfo("%s::createNewPOI: %s, environment: %s" ,self.node_name, self.add_poi_service_name, self.robot_environment)
-
-    success,msg=self.save_poi_service(new_point.name,new_point.header.frame_id,new_point.pose)
+        
+    
+    success,msg=self.save_poi_service(new_point.name, new_point.header.frame_id, new_point.pose, self.joint_states_dict) 
+     
     if success == False:
         rospy.logerr('%s::createNewPOI: Error calling save_poi_service -> %s', rospy.get_name(), msg)
 

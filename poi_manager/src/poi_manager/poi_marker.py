@@ -539,18 +539,9 @@ class PointPathManager(InteractiveMarkerServer):
 
 
     rospy.loginfo("%s::createNewPOI: %s, environment: %s" ,self.node_name, self.add_poi_service_name, self.robot_environment)
-
-    #fill new dictionary with the camera joint states taken from the joint_states_dict
-    poi_joint_dict = {}
-    for i in self.joint_states_dict:
-      if "camera" in i:
-        if "zoom" in i:
-          poi_joint_dict[i] = 1.0
-        else:
-          poi_joint_dict[i] = 0.0
         
     
-    success,msg=self.save_poi_service(new_point.name, new_point.header.frame_id, new_point.pose, poi_joint_dict) 
+    success,msg=self.save_poi_service(new_point.name, new_point.header.frame_id, new_point.pose, self.joint_states_dict) 
      
     if success == False:
         rospy.logerr('%s::createNewPOI: Error calling save_poi_service -> %s', rospy.get_name(), msg)

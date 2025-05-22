@@ -647,7 +647,6 @@ class PointPathManager(InteractiveMarkerServer):
 
   def editPOI(self, feedback):
       rospy.loginfo("%s::editPOI: %s menu:%s" % (rospy.get_name(), feedback.marker_name, feedback.menu_entry_id))
-      rospy.logwarn("%s::editPOI: feedback %s" % (rospy.get_name(), feedback))
       if self.counter_points_index > 0:
           handle = feedback.menu_entry_id
           state = self.menu_handler.getCheckState(handle)

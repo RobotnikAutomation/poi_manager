@@ -503,35 +503,59 @@ class PointPathManager(InteractiveMarkerServer):
     self.appendPOI(new_point=new_point, editable=is_editable)
     return new_point
 
-  def save_poi_service(self, name, frame, pose, joints = {}):
+  def save_poi_service(self, name, frame, pose, joints = None):
     if self.robot_environment == "":
-      return False, "No environment selected"
+        return False, "No environment selected"
+
+    # Load existing joints if not provided
+    if joints is None or (isinstance(joints, dict) and len(joints) == 0):
+        rospy.loginfo(f"POI {name} joints not provided, trying to load from POI manager")
+        try:
+            get_req = GetPOIRequest()
+            get_req.name = name
+            get_req.environment = self.robot_environment
+            get_res = self.get_poi_client(get_req)
+
+            if get_res.success:
+                # Convert list of PoiJointState to dict
+                joints = {j.name: j.position for j in get_res.p.joints}
+                rospy.loginfo(f"The point has the following joints: {joints}")
+            else:
+                rospy.logwarn('%s::save_poi_service: POI %s does not exist, no joints recovered.', rospy.get_name(), name)
+                joints = {}
+
+        except rospy.ServiceException as e:
+            msg = "Error calling get_poi: %s" % str(e)
+            rospy.logerr('%s::save_poi_service: %s', rospy.get_name(), msg)
+            return False, msg
+
     try:
-      resp = rospy.ServiceProxy(self.add_poi_service_name , AddPOI)
-      p = LabeledPose()
-      p.name = name
-      p.environment = self.robot_environment
-      p.frame_id = frame
-      p.pose = pose
-      if type(joints) == list:
-        p.joints = joints
-      else:
+        resp = rospy.ServiceProxy(self.add_poi_service_name , AddPOI)
+        p = LabeledPose()
+        p.name = name
+        p.environment = self.robot_environment
+        p.frame_id = frame
+        p.pose = pose
         p.joints = []
-        for i in joints:
-          p.joints.append(PoiJointState(name = i, position = joints[i]))
 
-      res = resp(p)
+        if isinstance(joints, list):
+            rospy.loginfo(f"POI {name} joints provided as list: {joints}")
+            p.joints = joints
+        else:
+            for joint_name, joint_position in joints.items():
+                p.joints.append(PoiJointState(name=joint_name, position=joint_position))
+                rospy.loginfo("Added joint")
+        res = resp(p)
 
-      if (res.success):
-        return True,res.message
-      else:
-        return False,res.message
+        if res.success:
+            return True, res.message
+        else:
+            return False, res.message
 
     except rospy.ServiceException as e:
-      msg = "Service call to %s failed: %s" % (self.add_poi_service_name,e)
-      rospy.logerr('%s::save_poi_service: %s',rospy.get_name(), msg)
-      return False,msg
-
+        msg = "Service call to %s failed: %s" % (self.add_poi_service_name, e)
+        rospy.logerr('%s::save_poi_service: %s', rospy.get_name(), msg)
+        return False, msg
 
   ## @brief Callback called to create new POI from Menu
   def createNewPOI(self, feedback):
@@ -622,35 +646,56 @@ class PointPathManager(InteractiveMarkerServer):
       #~ self.update_pois()
 
   def editPOI(self, feedback):
-    rospy.loginfo("%s::editPOI: %s menu:%s"%(rospy.get_name(),feedback.marker_name,feedback.menu_entry_id))
-    if self.counter_points_index > 0:
-      handle = feedback.menu_entry_id
-      state = self.menu_handler.getCheckState( handle )
-      #check if is already editing
-      if state == MenuHandler.CHECKED:
-        self.menu_handler.setCheckState( handle, MenuHandler.UNCHECKED )
-        #delete the editable POI
-        for i in self.list_of_points:
-          if i.name==feedback.marker_name:
-            self.deletePOI(feedback)
-            break
-        #create Noeditable POI
-        success,msg=self.save_poi_service(i.name,i.header.frame_id,i.pose)
-        self.newPOIfromPose(i.pose, i.name, is_editable=False)
+      rospy.loginfo("%s::editPOI: %s menu:%s" % (rospy.get_name(), feedback.marker_name, feedback.menu_entry_id))
+      rospy.logwarn("%s::editPOI: feedback %s" % (rospy.get_name(), feedback))
+      if self.counter_points_index > 0:
+          handle = feedback.menu_entry_id
+          state = self.menu_handler.getCheckState(handle)
 
+          # Find the POI in the list before deleting it
+          target_poi = None
+          for i in self.list_of_points:
+              if i.name == feedback.marker_name:
+                  target_poi = i
+                  break
 
-        self.applyChanges()
-      else:
-        self.menu_handler.setCheckState( handle, MenuHandler.CHECKED )
-        self.pose = feedback.pose
-        #delete the POI
-        for i in self.list_of_points:
-          if i.name==feedback.marker_name:
-            self.deletePOI(feedback)
-            break
-        #create the POI now editable
-        self.newPOIfromPose(i.pose, i.name, is_editable=True)
-        self.applyChanges()
+          if target_poi is None:
+              rospy.logerr("%s::editPOI: POI %s not found", rospy.get_name(), feedback.marker_name)
+              return
+
+          if state == MenuHandler.CHECKED:
+              # --- Finish the edition of the POI ---
+              self.menu_handler.setCheckState(handle, MenuHandler.UNCHECKED)
+
+              self.deletePOI(feedback)  # borra el editable
+
+              # Save the POI with the updated pose and joints
+              success, msg = self.save_poi_service(target_poi.name, target_poi.header.frame_id, target_poi.pose, self.edit_joints)
+              self.edit_joints = {}
+              self.newPOIfromPose(target_poi.pose, target_poi.name, is_editable=False)
+              self.applyChanges()
+
+          else:
+              # --- Start the edition of the POI ---
+              self.menu_handler.setCheckState(handle, MenuHandler.CHECKED)
+              # Try to retrieve the joints from the server
+              self.edit_joints = {}
+              try:
+                get_req = GetPOIRequest()
+                get_req.name = target_poi.name
+                get_req.environment = self.robot_environment
+                get_res = self.get_poi_client(get_req)
+
+                if get_res.success:
+                    self.edit_joints = {j.name: j.position for j in get_res.p.joints}
+                else:
+                    rospy.logwarn("%s::editPOI: POI found in local list but not in server", rospy.get_name())
+              except rospy.ServiceException as e:
+                  rospy.logerr("%s::editPOI: Failed to retrieve joints for POI: %s", rospy.get_name(), str(e))
+              self.pose = feedback.pose
+              self.deletePOI(feedback)  # Delete the non-editable POI
+              self.newPOIfromPose(target_poi.pose, target_poi.name, is_editable=True)
+              self.applyChanges()
 
   ## @brief Starts the route
   def gotoPOI(self, feedback):

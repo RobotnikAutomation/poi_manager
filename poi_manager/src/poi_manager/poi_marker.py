@@ -539,12 +539,11 @@ class PointPathManager(InteractiveMarkerServer):
         p.joints = []
 
         if isinstance(joints, list):
-            rospy.loginfo(f"POI {name} joints provided as list: {joints}")
+            rospy.logdebug(f"POI {name} joints provided as list: {joints}")
             p.joints = joints
         else:
             for joint_name, joint_position in joints.items():
                 p.joints.append(PoiJointState(name=joint_name, position=joint_position))
-                rospy.loginfo("Added joint")
         res = resp(p)
 
         if res.success:

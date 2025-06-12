@@ -16,6 +16,9 @@ from poi_manager_msgs.srv import *
 from geometry_msgs.msg import Pose
 from std_msgs.msg import Empty
 from visualization_msgs.msg import MarkerArray, Marker
+import shutil
+from datetime import datetime
+from std_srvs.srv import Trigger, TriggerResponse
 
 
 
@@ -34,6 +37,7 @@ class PoiManager(RComponent):
         self.filename = rospy.get_param('~filename', 'test')
         self.folder = rospy.get_param('~folder', os.path.join(rospack.get_path('poi_manager'), 'config'))
         self.yaml_path = self.folder + '/' + self.filename+'.yaml'
+        self.yaml_backup_folder = rospy.get_param('~yaml_backup_folder', self.folder + '/backup')
 
         self.publish_markers = rospy.get_param('~publish_markers', False)
 
@@ -53,6 +57,8 @@ class PoiManager(RComponent):
         self.service_get_poi_list = rospy.Service('~get_poi_list', GetPOIs, self.get_poi_list_cb)
         self.service_add_poi = rospy.Service('~add_poi', AddPOI, self.add_poi_cb)
         self.service_add_poi_by_params = rospy.Service('~add_poi_by_params', AddPOI_params, self.add_poi_by_params_cb)
+        self.recover_backup_service = rospy.Service('~recover_last_backup', Trigger, self.recover_last_backup_srv_cb)
+
 
         if self.publish_markers:
             self.marker_array = MarkerArray()
@@ -143,16 +149,6 @@ class PoiManager(RComponent):
         self.read_pois_cb(req)
         self.switch_to_state(State.READY_STATE)
 
-    #def ready_state(self):
-
-        #if self.publish_markers:
-        #    self.update_marker_array()
-
-    def update_yaml(self):
-        yaml_file = open(self.yaml_path, 'w')
-        yaml.dump(self.pose_dict, yaml_file)
-        if self.publish_markers:
-            self.update_marker_array()
 
     def update_marker_array(self):
         marker_array = MarkerArray()
@@ -373,8 +369,14 @@ class PoiManager(RComponent):
             del (self.pose_dict['environments'][req.environment]['points'])
             del (self.pose_dict['environments'][req.environment])
             self.pose_list = []
-            yaml_file = open(self.yaml_path, 'w')
-            yaml.dump(self.pose_dict, yaml_file)
+            
+            ret_save,msg_save = self.save_yaml()
+            if ret_save == False:
+                rospy.logerr('%s::delete_environment_cb: Error saving yaml file -> %s', self._node_name, msg_save)
+                response.success = False
+                response.message = "Error saving yaml file: %s" % msg_save
+                return response
+            
             response.success = True
             response.message = "Environment %s deleted" % (req.environment )
             #print (response.message)
@@ -410,10 +412,17 @@ class PoiManager(RComponent):
                         #self.counter_points_index = self.counter_points_index - 1
                         break
             self.delete_empty_environment(req.environment)
+            
+            ret_save,msg_save = self.save_yaml()
+            if ret_save == False:
+                rospy.logerr('%s::delete_poi_cb: Error saving yaml file -> %s', self._node_name, msg_save)
+                response.success = False
+                response.message = "Error saving yaml file: %s" % msg_save
+                return response
+            
             response.success = True
             response.message = "point %s from environment %s deleted" % (req.name,req.environment )
-            yaml_file = open(self.yaml_path, 'w')
-            yaml.dump(self.pose_dict, yaml_file)
+        
         except Exception as identifier:
             msg = "%s::Error deleting point %s from environment %s. Error msg:%s" % (rospy.get_name(),req.name,req.environment,identifier)
             response.success = False
@@ -466,8 +475,13 @@ class PoiManager(RComponent):
             #print (self.pose_list)
 
             success,msg=self.process_pose_dictionary()
-            yaml_file = open(self.yaml_path, 'w')
-            yaml.dump(self.pose_dict, yaml_file, default_flow_style=False)
+            
+            ret_save,msg_save = self.save_yaml()
+            if ret_save == False:
+                rospy.logerr('%s::add_poi_cb: Error saving yaml file -> %s', self._node_name, msg_save)
+                response.success = False
+                response.message = "Error saving yaml file: %s" % msg_save
+                return response
 
             if success == False:
                 response.success = False
@@ -483,3 +497,120 @@ class PoiManager(RComponent):
             response.message = msg
 
         return response
+
+
+    def save_yaml(self):
+        """
+        Saves the current pose dictionary to a YAML file.
+
+        Attempts to write the contents of `self.pose_dict` to the file specified by `self.yaml_path`
+        in YAML format. If the operation is successful, returns a tuple indicating success and a 
+        success message. If an error occurs during the file operation, logs the error using ROS 
+        logging and returns a tuple indicating failure and the error message.
+
+        Returns:
+            tuple: (bool, str) where the first element indicates success, and the second is a message.
+        """
+        ret, msg = self.backup_yaml()
+        if not ret:
+            rospy.logerr('%s::save_yaml: %s', rospy.get_name(), msg)
+            return False, msg
+
+        try:
+            with open(self.yaml_path, 'w') as yaml_file:
+                yaml.dump(self.pose_dict, yaml_file, default_flow_style=False)
+            return True, "YAML file saved successfully"
+        except Exception as e:
+            rospy.logerr('%s::save_yaml: %s', rospy.get_name(), str(e))
+            return False, "Error saving yaml: %s" % e
+        
+
+    def backup_yaml(self):
+        """
+        Creates a backup of the current YAML file in the specified backup_folder.
+        The backup file will have a prefix based on the current date and time.
+
+        Args:
+            backup_folder (str): The folder where the backup will be stored.
+
+        Returns:
+            tuple: (bool, str) indicating success and a message.
+        """
+
+        if not os.path.exists(self.yaml_path):
+            return False, "YAML file does not exist to backup"
+
+        if not os.path.exists(self.yaml_backup_folder):
+            try:
+                os.makedirs(self.yaml_backup_folder)
+            except Exception as e:
+                return False, "Could not create backup folder: %s" % e
+
+        date_prefix = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_filename = os.path.basename(self.yaml_path)
+        backup_filename = f"{date_prefix}_{base_filename}"
+        backup_path = os.path.join(self.yaml_backup_folder, backup_filename)
+
+        try:
+            shutil.copy2(self.yaml_path, backup_path)
+            msg = f"Backup created at {backup_path}"
+            rospy.loginfo('%s::backup_yaml: %s', rospy.get_name(), msg)
+            return True, msg
+        except Exception as e:
+            rospy.logerr('%s::backup_yaml: %s', rospy.get_name(), str(e))
+            return False, "Error creating backup: %s" % e
+
+
+    def recover_last_backup(self):
+        """
+        Recovers the most recent backup YAML file from the backup folder and replaces the current YAML file.
+
+        Returns:
+            tuple: (bool, str) indicating success and a message.
+        """
+        try:
+            if not os.path.exists(self.yaml_backup_folder):
+                return False, "Backup folder does not exist"
+
+            backups = [
+                f for f in os.listdir(self.yaml_backup_folder)
+                if os.path.isfile(os.path.join(self.yaml_backup_folder, f)) and f.endswith('.yaml')
+            ]
+            if not backups:
+                return False, "No backup files found"
+
+            # Sort backups by filename (date prefix)
+            backups.sort(reverse=True)
+            last_backup = backups[0]
+            backup_path = os.path.join(self.yaml_backup_folder, last_backup)
+            #
+            # Save current state before recovery
+            ret_save,msg_save = self.save_yaml()
+            if ret_save == False:
+                rospy.logerr('%s::recover_last_backup: Error saving yaml file -> %s', self._node_name, msg_save)    
+                return False, msg_save
+            # Copy the last backup to the original YAML path
+            shutil.copy2(backup_path, self.yaml_path)
+            msg = f"Recovered backup from {backup_path} to {self.yaml_path}"
+            rospy.loginfo('%s::recover_last_backup: %s', rospy.get_name(), msg)
+            
+            ret_parse, msg_parse = self.parse_yaml()
+            
+            if ret_parse == False:
+                rospy.logerr('%s::recover_last_backup: Error parsing yaml file -> %s', self._node_name, msg_parse)
+                return False, msg_parse
+            
+            ret_process, msg_process = self.process_pose_dictionary()
+            if ret_process == False:
+                rospy.logerr('%s::recover_last_backup: Error processing data from yaml file -> %s', self._node_name, msg_process)
+                return False, msg_process
+            return True, "OK, last backup recovered successfully"
+        
+        except Exception as e:
+            rospy.logerr('%s::recover_last_backup: %s', rospy.get_name(), str(e))
+            return False, "Error recovering backup: %s" % e
+        
+
+    def recover_last_backup_srv_cb(self, req):
+        success, message = self.recover_last_backup()
+        return TriggerResponse(success=success, message=message)

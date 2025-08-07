@@ -211,7 +211,7 @@ class PointPath(InteractiveMarker):
         self.marker.scale.x = marker_scale_x
         self.marker.scale.y = marker_scale_y
         self.marker.scale.z = marker_scale_z
-        #self.marker.pose.position.z = 0.05
+        self.marker.pose.position.z = 0.05
         self.color = color
 
         ##Text of markers

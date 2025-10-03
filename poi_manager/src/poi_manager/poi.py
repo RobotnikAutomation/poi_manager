@@ -218,21 +218,100 @@ class PoiManager(RComponent):
             rospy.loginfo("%s::read_pois_cb: OK", self._node_name)
             return ReadPOIsResponse(success,msg,self.pose_list)
 
+    def _validate_poi(self, poi):
+        """Validate a single POI and return error message if invalid"""
+        if poi.environment == "":
+            return "The environment is empty"
+        if poi.name == "":
+            return "The name of the POI is empty"
+        if poi.frame_id == "":
+            return "The frame_id of the POI is empty"
+        return None
+
+    def _save_pois_list(self, pois_list):
+        """
+        Save a list of POIs efficiently with a single lock acquisition and YAML save.
+        
+        Args:
+            pois_list: List of LabeledPose objects to save
+            
+        Returns:
+            tuple: (success, message, failed_pois) where failed_pois is a list of POI names that failed validation
+        """
+        failed_pois = []
+        
+        # Validate all POIs first
+        for poi in pois_list:
+            error_msg = self._validate_poi(poi)
+            if error_msg:
+                failed_pois.append(f"{poi.name}: {error_msg}")
+        
+        if failed_pois:
+            return False, f"Validation failed for POIs: {', '.join(failed_pois)}", failed_pois
+        
+        # Use lock to prevent race conditions when modifying POI data
+        with self.poi_lock:
+            try:
+                # Process all POIs in a single transaction
+                for poi in pois_list:
+                    self.try_create_env(self.pose_dict, poi.environment)
+                    self.try_create_point(self.pose_dict, poi.environment, poi.name)
+                    
+                    joints_dict = {}
+                    for j in poi.joints:
+                        joints_dict[j.name] = j.position
+                        
+                    point = {'position': [float(poi.pose.position.x),
+                                        float(poi.pose.position.y),
+                                        float(poi.pose.position.z)],
+                            'orientation': [float(poi.pose.orientation.x),
+                                          float(poi.pose.orientation.y),
+                                          float(poi.pose.orientation.z),
+                                          float(poi.pose.orientation.w)],
+                            'frame_id': poi.frame_id,
+                            'params': poi.params,
+                            'joints': joints_dict}
+                            
+                    self.pose_dict['environments'][poi.environment]['points'][poi.name] = point
+                    self.pose_list.append(poi)
+
+                # Process dictionary and save to YAML only once
+                success, msg = self.process_pose_dictionary()
+                if not success:
+                    return False, f"Error processing pose dictionary: {msg}", []
+                
+                ret_save, msg_save = self.save_yaml()
+                if not ret_save:
+                    return False, f"Error saving yaml file: {msg_save}", []
+                
+                return True, f"Successfully saved {len(pois_list)} POIs", []
+                
+            except Exception as e:
+                error_msg = f"Error saving POIs: {e}"
+                rospy.logerr('%s::_save_pois_list: %s', self._node_name, error_msg)
+                return False, error_msg, []
+
     def add_pois_cb(self, req):
         response = AddPOIsResponse()
-        req_add_poi=AddPOIRequest()
-        for i in req.pose_list:
-            if(i.environment != ""):
-              req_add_poi.p = i
-              ret = self.add_poi_cb(req_add_poi)
-              if ret.success == False:
-                  response.success = False
-                  response.message = ret.message
-                  return response
-
-        response.success = True
-        response.message = "OK"
-        rospy.loginfo("%s::add_pois_cb: Read pois service done", self._node_name)
+        
+        # Filter out POIs with empty environments
+        valid_pois = [poi for poi in req.pose_list if poi.environment != ""]
+        
+        if not valid_pois:
+            response.success = False
+            response.message = "No valid POIs found (all have empty environments)"
+            return response
+        
+        success, message, failed_pois = self._save_pois_list(valid_pois)
+        
+        response.success = success
+        response.message = message
+        
+        if success:
+            rospy.loginfo("%s::add_pois_cb: Successfully saved %d POIs", self._node_name, len(valid_pois))
+        else:
+            rospy.logerr('%s::add_pois_cb: %s', self._node_name, message)
+            
         return response
 
 
@@ -448,73 +527,18 @@ class PoiManager(RComponent):
 
     def add_poi_cb(self,req):
         response = AddPOIResponse()
-        if req.p.environment == "":
-            msg = "The environment is empty"
-            rospy.logerr("%s::add_poi_cb: %s" % (self._node_name, msg))
-            response.message = msg
-            response.success = False
-            return response
         
-        if req.p.name == "":
-            msg = "The name of the POI is empty"
-            rospy.logerr("%s::add_poi_cb: %s" % (self._node_name, msg))
-            response.message = msg
-            response.success = False
-            return response
+        # Use the same efficient saving logic for single POI
+        success, message, failed_pois = self._save_pois_list([req.p])
         
-        if req.p.frame_id == "":
-            msg = "The frame_id of the POI is empty"
-            rospy.logerr("%s::add_poi_cb: %s" % (self._node_name, msg))
-            response.message = msg
-            response.success = False
-            return response
+        response.success = success
+        response.message = message
         
-        # Use lock to prevent race conditions when modifying POI data
-        with self.poi_lock:
-            try:
-                self.try_create_env(self.pose_dict,req.p.environment)
-                self.try_create_point(self.pose_dict,req.p.environment,req.p.name)
-                joints_dict = {}
-                for j in req.p.joints:
-                    joints_dict[j.name] = j.position
-                point  = {'position':[float(req.p.pose.position.x),
-                                      float(req.p.pose.position.y),
-                                      float(req.p.pose.position.z)],
-                        'orientation':[ float(req.p.pose.orientation.x),
-                                        float(req.p.pose.orientation.y),
-                                        float(req.p.pose.orientation.z),
-                                        float(req.p.pose.orientation.w)],
-                        'frame_id':req.p.frame_id,
-                        'params':req.p.params,
-                        'joints':joints_dict}
-                self.pose_dict['environments'][req.p.environment]['points'][req.p.name] = point
-
-                self.pose_list.append(req.p)
-
-                #print (self.pose_list)
-
-                success,msg=self.process_pose_dictionary()
-                
-                ret_save,msg_save = self.save_yaml()
-                if ret_save == False:
-                    rospy.logerr('%s::add_poi_cb: Error saving yaml file -> %s', self._node_name, msg_save)
-                    response.success = False
-                    response.message = "Error saving yaml file: %s" % msg_save
-                    return response
-
-                if success == False:
-                    response.success = False
-                    response.message = "point %s from environment %s Not created/modified ERROR adding to pose list" % (req.p.name,req.p.environment )
-                response.success = True
-                response.message = "point %s from environment %s created/modified" % (req.p.name,req.p.environment )
-
-
-            except Exception as identifier:
-                msg = "Error adding point %s into environment %s: %s" % (req.p.name,req.p.environment,identifier)
-                rospy.logerr('%s::add_poi_cb: %s', rospy.get_name(), msg)
-                response.success = False
-                response.message = msg
-
+        if success:
+            rospy.loginfo("%s::add_poi_cb: %s", self._node_name, message)
+        else:
+            rospy.logerr('%s::add_poi_cb: %s', self._node_name, message)
+            
         return response
 
 

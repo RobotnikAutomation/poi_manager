@@ -10,6 +10,7 @@ import yaml
 import rospkg
 import tf
 import os
+import threading
 from poi_manager_msgs.msg import *
 from poi_manager_msgs.srv import *
 
@@ -27,6 +28,8 @@ class PoiManager(RComponent):
     def __init__(self):
         self.pose_list = []
         self.pose_dict = {'environments':{}}
+        # Add thread lock to prevent race conditions when saving POIs
+        self.poi_lock = threading.Lock()
         RComponent.__init__(self)
 
     def ros_read_params(self):
@@ -203,15 +206,17 @@ class PoiManager(RComponent):
         return marker
 
     def read_pois_cb(self, req):
-        success,msg = self.parse_yaml()
-        if success == False:
-            rospy.logerr('%s::read_pois_cb: Error parsing yaml file -> %s', self._node_name, msg)
+        # Use lock to prevent race conditions when loading POI data
+        with self.poi_lock:
+            success,msg = self.parse_yaml()
+            if success == False:
+                rospy.logerr('%s::read_pois_cb: Error parsing yaml file -> %s', self._node_name, msg)
+                return ReadPOIsResponse(success,msg,self.pose_list)
+            success,msg = self.process_pose_dictionary()
+            if success == False:
+                rospy.logerr('%s::read_pois_cb: Error processing data from yaml file -> %s', self._node_name, msg)
+            rospy.loginfo("%s::read_pois_cb: OK", self._node_name)
             return ReadPOIsResponse(success,msg,self.pose_list)
-        success,msg = self.process_pose_dictionary()
-        if success == False:
-            rospy.logerr('%s::read_pois_cb: Error processing data from yaml file -> %s', self._node_name, msg)
-        rospy.loginfo("%s::read_pois_cb: OK", self._node_name)
-        return ReadPOIsResponse(success,msg,self.pose_list)
 
     def add_pois_cb(self, req):
         response = AddPOIsResponse()
@@ -237,74 +242,82 @@ class PoiManager(RComponent):
             response.success = False
             response.message = "The environment is empty, this enviroment has 0 points"
             return response
-        if len(self.pose_list) > 0:
-            for poi in self.pose_list:
-                if poi.name == req.name and poi.environment == req.environment:
-                    response.success = True
-                    response.message = " Poi %s/%s found" % (req.name,req.environment)
-                    response.p = poi
-                    return response
-        else:
+        # Use lock to ensure consistent read access to POI data
+        with self.poi_lock:
+            if len(self.pose_list) > 0:
+                for poi in self.pose_list:
+                    if poi.name == req.name and poi.environment == req.environment:
+                        response.success = True
+                        response.message = " Poi %s/%s found" % (req.name,req.environment)
+                        response.p = poi
+                        return response
+            else:
+                response.success = False
+                response.message = " Poi %s/%s Not found, empty list" % (req.name,req.environment)
+                return response
             response.success = False
-            response.message = " Poi %s/%s Not found, empty list" % (req.name,req.environment)
-            return response
-        response.success = False
-        response.message = " Poi %s/%s Not found" % (req.name,req.environment)
+            response.message = " Poi %s/%s Not found" % (req.name,req.environment)
         return response
 
     def get_poi_params_cb(self, req):
         response = GetPOI_paramsResponse()
-        if len(self.pose_list) > 0:
-            for poi in self.pose_list:
-                if poi.name == req.name and poi.environment == req.environment:
-                    response.success = True
-                    response.message = " Poi %s/%s found" % (req.name,req.environment)
-                    response.name = poi.name
-                    response.environment = poi.environment
-                    response.frame_id = poi.frame_id
-                    response.params = poi.params
-                    response.x = poi.pose.position.x
-                    response.y = poi.pose.position.y
-                    response.z = poi.pose.position.z
-                    q = [poi.pose.orientation.x,poi.pose.orientation.y,poi.pose.orientation.z,poi.pose.orientation.w ]
-                    euler = tf.transformations.euler_from_quaternion(q)
-                    response.roll = euler[0]
-                    response.pitch = euler[1]
-                    response.yaw = euler[2]
-                    return response
-        else:
+        # Use lock to ensure consistent read access to POI data
+        with self.poi_lock:
+            if len(self.pose_list) > 0:
+                for poi in self.pose_list:
+                    if poi.name == req.name and poi.environment == req.environment:
+                        response.success = True
+                        response.message = " Poi %s/%s found" % (req.name,req.environment)
+                        response.name = poi.name
+                        response.environment = poi.environment
+                        response.frame_id = poi.frame_id
+                        response.params = poi.params
+                        response.x = poi.pose.position.x
+                        response.y = poi.pose.position.y
+                        response.z = poi.pose.position.z
+                        q = [poi.pose.orientation.x,poi.pose.orientation.y,poi.pose.orientation.z,poi.pose.orientation.w ]
+                        euler = tf.transformations.euler_from_quaternion(q)
+                        response.roll = euler[0]
+                        response.pitch = euler[1]
+                        response.yaw = euler[2]
+                        return response
+            else:
+                response.success = False
+                response.message = " Poi %s/%s Not found, empty list" % (req.name,req.environment)
+                return response
             response.success = False
-            response.message = " Poi %s/%s Not found, empty list" % (req.name,req.environment)
-            return response
-        response.success = False
-        response.message = " Poi %s/%s Not found" % (req.name,req.environment)
+            response.message = " Poi %s/%s Not found" % (req.name,req.environment)
         return response
 
     def get_environments_cb(self, req):
         response = GetEnvironmentsResponse()
-        for key,value in self.pose_dict['environments'].items():
-            response.environments.append(key)
+        # Use lock to ensure consistent read access to POI data
+        with self.poi_lock:
+            for key,value in self.pose_dict['environments'].items():
+                response.environments.append(key)
         return response
 
     def get_poi_list_cb(self, req):
         response = GetPOIsResponse()
         num = 0
-        self.parse_yaml()
-        self.process_pose_dictionary()
-        if len(self.pose_list) > 0:
-            for poi in self.pose_list:
-                if poi.environment == req.environment and req.environment!="":
-                    response.p_list.append(poi)
-                    num = num + 1
-            if num>=0:
-                response.success = True
-                response.message = "  Found %d POIs from %s " % (num,req.environment)
+        # Use lock to prevent race conditions when loading POI data
+        with self.poi_lock:
+            self.parse_yaml()
+            self.process_pose_dictionary()
+            if len(self.pose_list) > 0:
+                for poi in self.pose_list:
+                    if poi.environment == req.environment and req.environment!="":
+                        response.p_list.append(poi)
+                        num = num + 1
+                if num>=0:
+                    response.success = True
+                    response.message = "  Found %d POIs from %s " % (num,req.environment)
+                else:
+                    response.success = False
+                    response.message = "  Found %d POIs from %s " % (num,req.environment)
             else:
                 response.success = False
-                response.message = "  Found %d POIs from %s " % (num,req.environment)
-        else:
-            response.success = False
-            response.message = " Pois from %s Not found, empty list" % (req.environment)
+                response.message = " Pois from %s Not found, empty list" % (req.environment)
         return response
 
     def try_create_env(self,dict_name,new_env):
@@ -365,27 +378,29 @@ class PoiManager(RComponent):
             response.success = False
             response.message = "The environment is empty"
             return response
-        try:
-            del (self.pose_dict['environments'][req.environment]['points'])
-            del (self.pose_dict['environments'][req.environment])
-            self.pose_list = []
-            
-            ret_save,msg_save = self.save_yaml()
-            if ret_save == False:
-                rospy.logerr('%s::delete_environment_cb: Error saving yaml file -> %s', self._node_name, msg_save)
-                response.success = False
-                response.message = "Error saving yaml file: %s" % msg_save
-                return response
-            
-            response.success = True
-            response.message = "Environment %s deleted" % (req.environment )
-            #print (response.message)
+        # Use lock to prevent race conditions when modifying POI data
+        with self.poi_lock:
+            try:
+                del (self.pose_dict['environments'][req.environment]['points'])
+                del (self.pose_dict['environments'][req.environment])
+                self.pose_list = []
+                
+                ret_save,msg_save = self.save_yaml()
+                if ret_save == False:
+                    rospy.logerr('%s::delete_environment_cb: Error saving yaml file -> %s', self._node_name, msg_save)
+                    response.success = False
+                    response.message = "Error saving yaml file: %s" % msg_save
+                    return response
+                
+                response.success = True
+                response.message = "Environment %s deleted" % (req.environment )
+                #print (response.message)
 
-        except Exception as identifier:
-            msg = "%s::Error deleting environment %s. Error msg:%s" % (rospy.get_name(),req.environment,identifier)
-            response.success = False
-            response.message = msg
-            #print (response.message)
+            except Exception as identifier:
+                msg = "%s::Error deleting environment %s. Error msg:%s" % (rospy.get_name(),req.environment,identifier)
+                response.success = False
+                response.message = msg
+                #print (response.message)
         return response
 
 
@@ -402,31 +417,33 @@ class PoiManager(RComponent):
 
     def delete_poi_cb(self,req):
         response = DeletePOIResponse()
-        try:
-            del (self.pose_dict['environments'][req.environment]['points'][req.name])
-            if len(self.pose_list) > 0:
-                for i in self.pose_list:
-                    if i.name==req.name:
-                        self.pose_list.remove(i)
-                        # self.erase(i.name)
-                        #self.counter_points_index = self.counter_points_index - 1
-                        break
-            self.delete_empty_environment(req.environment)
+        # Use lock to prevent race conditions when modifying POI data
+        with self.poi_lock:
+            try:
+                del (self.pose_dict['environments'][req.environment]['points'][req.name])
+                if len(self.pose_list) > 0:
+                    for i in self.pose_list:
+                        if i.name==req.name:
+                            self.pose_list.remove(i)
+                            # self.erase(i.name)
+                            #self.counter_points_index = self.counter_points_index - 1
+                            break
+                self.delete_empty_environment(req.environment)
+                
+                ret_save,msg_save = self.save_yaml()
+                if ret_save == False:
+                    rospy.logerr('%s::delete_poi_cb: Error saving yaml file -> %s', self._node_name, msg_save)
+                    response.success = False
+                    response.message = "Error saving yaml file: %s" % msg_save
+                    return response
+                
+                response.success = True
+                response.message = "point %s from environment %s deleted" % (req.name,req.environment )
             
-            ret_save,msg_save = self.save_yaml()
-            if ret_save == False:
-                rospy.logerr('%s::delete_poi_cb: Error saving yaml file -> %s', self._node_name, msg_save)
+            except Exception as identifier:
+                msg = "%s::Error deleting point %s from environment %s. Error msg:%s" % (rospy.get_name(),req.name,req.environment,identifier)
                 response.success = False
-                response.message = "Error saving yaml file: %s" % msg_save
-                return response
-            
-            response.success = True
-            response.message = "point %s from environment %s deleted" % (req.name,req.environment )
-        
-        except Exception as identifier:
-            msg = "%s::Error deleting point %s from environment %s. Error msg:%s" % (rospy.get_name(),req.name,req.environment,identifier)
-            response.success = False
-            response.message = msg
+                response.message = msg
         return response
 
     def add_poi_cb(self,req):
@@ -452,49 +469,51 @@ class PoiManager(RComponent):
             response.success = False
             return response
         
-        try:
-            self.try_create_env(self.pose_dict,req.p.environment)
-            self.try_create_point(self.pose_dict,req.p.environment,req.p.name)
-            joints_dict = {}
-            for j in req.p.joints:
-                joints_dict[j.name] = j.position
-            point  = {'position':[float(req.p.pose.position.x),
-                                  float(req.p.pose.position.y),
-                                  float(req.p.pose.position.z)],
-                    'orientation':[ float(req.p.pose.orientation.x),
-                                    float(req.p.pose.orientation.y),
-                                    float(req.p.pose.orientation.z),
-                                    float(req.p.pose.orientation.w)],
-                    'frame_id':req.p.frame_id,
-                    'params':req.p.params,
-                    'joints':joints_dict}
-            self.pose_dict['environments'][req.p.environment]['points'][req.p.name] = point
+        # Use lock to prevent race conditions when modifying POI data
+        with self.poi_lock:
+            try:
+                self.try_create_env(self.pose_dict,req.p.environment)
+                self.try_create_point(self.pose_dict,req.p.environment,req.p.name)
+                joints_dict = {}
+                for j in req.p.joints:
+                    joints_dict[j.name] = j.position
+                point  = {'position':[float(req.p.pose.position.x),
+                                      float(req.p.pose.position.y),
+                                      float(req.p.pose.position.z)],
+                        'orientation':[ float(req.p.pose.orientation.x),
+                                        float(req.p.pose.orientation.y),
+                                        float(req.p.pose.orientation.z),
+                                        float(req.p.pose.orientation.w)],
+                        'frame_id':req.p.frame_id,
+                        'params':req.p.params,
+                        'joints':joints_dict}
+                self.pose_dict['environments'][req.p.environment]['points'][req.p.name] = point
 
-            self.pose_list.append(req.p)
+                self.pose_list.append(req.p)
 
-            #print (self.pose_list)
+                #print (self.pose_list)
 
-            success,msg=self.process_pose_dictionary()
-            
-            ret_save,msg_save = self.save_yaml()
-            if ret_save == False:
-                rospy.logerr('%s::add_poi_cb: Error saving yaml file -> %s', self._node_name, msg_save)
+                success,msg=self.process_pose_dictionary()
+                
+                ret_save,msg_save = self.save_yaml()
+                if ret_save == False:
+                    rospy.logerr('%s::add_poi_cb: Error saving yaml file -> %s', self._node_name, msg_save)
+                    response.success = False
+                    response.message = "Error saving yaml file: %s" % msg_save
+                    return response
+
+                if success == False:
+                    response.success = False
+                    response.message = "point %s from environment %s Not created/modified ERROR adding to pose list" % (req.p.name,req.p.environment )
+                response.success = True
+                response.message = "point %s from environment %s created/modified" % (req.p.name,req.p.environment )
+
+
+            except Exception as identifier:
+                msg = "Error adding point %s into environment %s: %s" % (req.p.name,req.p.environment,identifier)
+                rospy.logerr('%s::add_poi_cb: %s', rospy.get_name(), msg)
                 response.success = False
-                response.message = "Error saving yaml file: %s" % msg_save
-                return response
-
-            if success == False:
-                response.success = False
-                response.message = "point %s from environment %s Not created/modified ERROR adding to pose list" % (req.p.name,req.p.environment )
-            response.success = True
-            response.message = "point %s from environment %s created/modified" % (req.p.name,req.p.environment )
-
-
-        except Exception as identifier:
-            msg = "Error adding point %s into environment %s: %s" % (req.p.name,req.p.environment,identifier)
-            rospy.logerr('%s::add_poi_cb: %s', rospy.get_name(), msg)
-            response.success = False
-            response.message = msg
+                response.message = msg
 
         return response
 
@@ -612,5 +631,7 @@ class PoiManager(RComponent):
         
 
     def recover_last_backup_srv_cb(self, req):
-        success, message = self.recover_last_backup()
+        # Use lock to prevent race conditions when recovering backup
+        with self.poi_lock:
+            success, message = self.recover_last_backup()
         return TriggerResponse(success=success, message=message)

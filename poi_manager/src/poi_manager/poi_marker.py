@@ -200,6 +200,12 @@ class PointPath(InteractiveMarker):
         marker_scale_x = rospy.get_param('~marker_scale_x', 0.5)
         marker_scale_y = rospy.get_param('~marker_scale_y', 0.15)
         marker_scale_z = rospy.get_param('~marker_scale_z', 0.15)
+        # New params to enlarge interactive areas (drag + rotate)
+        drag_pad_extra_scale = rospy.get_param('~drag_pad_extra_scale', 1.2)  # factor applied over arrow length for drag pad
+        rotate_handle_radius = rospy.get_param('~rotate_handle_radius', 1.25)  # radius of rotation helper cylinder
+        rotate_handle_thickness = rospy.get_param('~rotate_handle_thickness', 0.01)  # thickness of rotation helper cylinder
+        use_rotation_helper = rospy.get_param('~use_rotation_helper', True)
+        use_drag_pad_helper = rospy.get_param('~use_drag_pad_helper', True)
 
         self.header.frame_id = frame_id
         self.name = name
@@ -239,6 +245,18 @@ class PointPath(InteractiveMarker):
             self.marker_move_control.orientation.z = 0
             self.marker_move_control.name = "move_plane"
             self.marker_move_control.markers.append( self.marker )
+            if use_drag_pad_helper:
+              drag_pad = Marker()
+              drag_pad.type = Marker.CYLINDER
+              drag_pad.pose.position.z = 0.025
+              drag_pad.scale.x = self.marker.scale.x * drag_pad_extra_scale
+              drag_pad.scale.y = self.marker.scale.x * drag_pad_extra_scale
+              drag_pad.scale.z = 0.02
+              drag_pad.color.r = self.marker.color.r
+              drag_pad.color.g = self.marker.color.g
+              drag_pad.color.b = self.marker.color.b
+              drag_pad.color.a = 0.05  # almost transparent but clickable
+              self.marker_move_control.markers.append(drag_pad)
             self.marker_move_control.interaction_mode = InteractiveMarkerControl.MOVE_PLANE
             self.controls.append( self.marker_move_control )
 
@@ -251,6 +269,18 @@ class PointPath(InteractiveMarker):
             self.marker_rotate_control.name = "rotate_z"
             self.marker_rotate_control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
 
+            if use_rotation_helper:
+              rotate_pad = Marker()
+              rotate_pad.type = Marker.CYLINDER
+              rotate_pad.pose.position.z = 0.01
+              rotate_pad.scale.x = rotate_handle_radius * 2.0
+              rotate_pad.scale.y = rotate_handle_radius * 2.0
+              rotate_pad.scale.z = rotate_handle_thickness
+              rotate_pad.color.r = 0.9
+              rotate_pad.color.g = 0.9
+              rotate_pad.color.b = 0.1
+              rotate_pad.color.a = 0.15
+              self.marker_rotate_control.markers.append(rotate_pad)
             self.controls.append( self.marker_rotate_control )
 
             #control of text marker
@@ -263,11 +293,11 @@ class PointPath(InteractiveMarker):
         #arrow color
           self.marker.color.r = 0.8
           self.marker.color.g = 0.8
-          self.marker.color.b = 0.0
+          self.marker.color.b = 0.8
           self.marker.color.a = 0.75
-          self.marker.scale.x = 1
-          self.marker.scale.y = 0.2
-          self.marker.scale.z = 0.2
+          self.marker.scale.x = 0.5
+          self.marker.scale.y = 0.5
+          self.marker.scale.z = 0.5
           #interactive marker move_plane
           self.marker_move_control = InteractiveMarkerControl()
           self.marker_move_control.always_visible = True
@@ -277,6 +307,18 @@ class PointPath(InteractiveMarker):
           self.marker_move_control.orientation.z = 0
           self.marker_move_control.name = "move_plane"
           self.marker_move_control.markers.append( self.marker )
+          if use_drag_pad_helper:
+            drag_pad = Marker()
+            drag_pad.type = Marker.CYLINDER
+            drag_pad.pose.position.z = 0.025
+            drag_pad.scale.x = self.marker.scale.x * drag_pad_extra_scale
+            drag_pad.scale.y = self.marker.scale.x * drag_pad_extra_scale
+            drag_pad.scale.z = 0.02
+            drag_pad.color.r = self.marker.color.r
+            drag_pad.color.g = self.marker.color.g
+            drag_pad.color.b = self.marker.color.b
+            drag_pad.color.a = 0.05
+            self.marker_move_control.markers.append(drag_pad)
           self.marker_move_control.interaction_mode = InteractiveMarkerControl.MOVE_PLANE
 
           self.controls.append( self.marker_move_control )
@@ -289,6 +331,18 @@ class PointPath(InteractiveMarker):
           self.marker_rotate_control.name = "rotate_z"
           self.marker_rotate_control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
 
+          if use_rotation_helper:
+            rotate_pad = Marker()
+            rotate_pad.type = Marker.CYLINDER
+            rotate_pad.pose.position.z = 0.01
+            rotate_pad.scale.x = rotate_handle_radius * 2.0
+            rotate_pad.scale.y = rotate_handle_radius * 2.0
+            rotate_pad.scale.z = rotate_handle_thickness
+            rotate_pad.color.r = 0.9
+            rotate_pad.color.g = 0.9
+            rotate_pad.color.b = 0.1
+            rotate_pad.color.a = 0.15
+            self.marker_rotate_control.markers.append(rotate_pad)
           self.controls.append( self.marker_rotate_control )
 
           #control of text marker
@@ -312,12 +366,19 @@ class PointPath(InteractiveMarker):
         self.marker_control.interaction_mode = InteractiveMarkerControl.MENU
         self.controls.append( self.marker_control )
 
+        # Enlarge global interactive marker scale so default rotate ring is larger
+        base_length = max(self.marker.scale.x, marker_scale_x)
+        self.scale = base_length * drag_pad_extra_scale
+
         #color of text
         marker_name.text = name
         marker_name.color.a = 0.95
-        marker_name.scale.x = 0.35
-        marker_name.scale.y = 0.1
-        marker_name.scale.z = 0.1
+        marker_name.color.r = 0.0
+        marker_name.color.g = 0.0
+        marker_name.color.b = 0.8
+        marker_name.scale.x = 0.5
+        marker_name.scale.y = 0.5
+        marker_name.scale.z = 0.5
         marker_name.pose.position.x	=0
         marker_name.pose.position.y	=0
         marker_name.pose.position.z	=0.2

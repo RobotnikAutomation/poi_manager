@@ -95,6 +95,7 @@ class PoiManager:
         marker.action = Marker.ADD
         marker.pose.position.x = data[1][0]
         marker.pose.position.y = data[1][1]
+        marker.pose.position.z = 0.05
         quaternion = tf.transformations.quaternion_from_euler(0, 0, data[1][2])
         marker.pose.orientation.x = quaternion[0]
         marker.pose.orientation.y = quaternion[1]

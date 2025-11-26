@@ -273,7 +273,6 @@ class PoiManager(RComponent):
                             'joints': joints_dict}
                             
                     self.pose_dict['environments'][poi.environment]['points'][poi.name] = point
-                    self.pose_list.append(poi)
 
                 # Process dictionary and save to YAML only once
                 success, msg = self.process_pose_dictionary()
@@ -294,25 +293,14 @@ class PoiManager(RComponent):
     def add_pois_cb(self, req):
         response = AddPOIsResponse()
         
-        # Filter out POIs with empty environments
-        valid_pois = [poi for poi in req.pose_list if poi.environment != ""]
-        
-        if not valid_pois:
-            response.success = False
-            response.message = "No valid POIs found (all have empty environments)"
-            return response
-        
-        success, message, failed_pois = self._save_pois_list(valid_pois)
+        # Pass all POIs to validation; validation will handle empty environments
+        success, message, failed_pois = self._save_pois_list(req.pose_list)
         
         response.success = success
         response.message = message
         
         if success:
-            rospy.loginfo("%s::add_pois_cb: Successfully saved %d POIs", self._node_name, len(valid_pois))
-        else:
-            rospy.logerr('%s::add_pois_cb: %s', self._node_name, message)
-            
-        return response
+            rospy.loginfo("%s::add_pois_cb: Successfully saved %d POIs", self._node_name, len(req.pose_list))
 
 
     def get_poi_cb(self, req):
@@ -323,17 +311,19 @@ class PoiManager(RComponent):
             return response
         # Use lock to ensure consistent read access to POI data
         with self.poi_lock:
-            if len(self.pose_list) > 0:
-                for poi in self.pose_list:
-                    if poi.name == req.name and poi.environment == req.environment:
-                        response.success = True
-                        response.message = " Poi %s/%s found" % (req.name,req.environment)
-                        response.p = poi
-                        return response
-            else:
+            if len(self.pose_list) == 0:
                 response.success = False
                 response.message = " Poi %s/%s Not found, empty list" % (req.name,req.environment)
                 return response
+
+            for poi in self.pose_list:
+                if poi.name == req.name and poi.environment == req.environment:
+                    response.success = True
+                    response.message = " Poi %s/%s found" % (req.name,req.environment)
+                    response.p = poi
+                    return response
+
+            # Not found in non-empty list
             response.success = False
             response.message = " Poi %s/%s Not found" % (req.name,req.environment)
         return response

@@ -1,4 +1,8 @@
-# poi_manager
+# POI Manager
+
+POI Manager is a ROS package to create, edit, and persist Points Of Interest (POIs) on a map, and to interactively send navigation goals through RViz.
+
+This document covers features, configuration, and the newly added interaction improvements and parameters.
 
 ## Installation
 
@@ -8,7 +12,7 @@ To use this package you will need to have the following Robotnik packages instal
 
 ## 1 poi_manager
 
-A ROS node to manage the points of interest in a map. It reads a list of tagged positions from a YAML file and offers services to obtain the list and update it. 
+A ROS node to manage the points of interest in a map. It reads a list of tagged positions from a YAML file and offers services to obtain the list and update it.
 
 ### 1.1 Parameters
 
@@ -86,13 +90,19 @@ A ROS node that provides interactive markers for managing POIs in RViz. It allow
 ### 2.1 Parameters
 
 * ~**frame_id** (String, default: "map"): Reference frame for the interactive markers.
-
 * ~**marker_scale_x** (Double, default: 0.5): X Scale of the interactive markers.
-
 * ~**marker_scale_y** (Double, default: 0.15): Y Scale of the interactive markers.
-
 * ~**marker_scale_z** (Double, default: 0.15): Z Scale of the interactive markers.
-
+* ~**marker_scale_x** (Double, default: 0.5): Arrow length.
+* ~**marker_scale_y** (Double, default: 0.15): Arrow shaft thickness.
+* ~**marker_scale_z** (Double, default: 0.15): Arrow head thickness.
+* ~**drag_pad_extra_scale** (Double, default: 1.2): Scale factor applied to a thin cylinder under the arrow used as a large drag area. Also increases the global interactive marker scale so the default RViz rotation ring is easier to grab.
+* ~**use_drag_pad_helper** (Bool, default: true): Enable/disable the larger drag pad helper.
+* ~**drag_pad_color** (Array[4], default: [0.2, 0.2, 0.2, 0.06]): RGBA color for the drag pad cylinder. Low alpha recommended to keep it discreet yet clickable.
+* ~**rotate_handle_radius** (Double, default: 1.25): Radius of the rotation helper cylinder used to increase the rotation interaction area.
+* ~**rotate_handle_thickness** (Double, default: 0.01): Thickness (height) of the rotation helper cylinder.
+* ~**use_rotation_helper** (Bool, default: true): Enable/disable the rotation helper pad.
+* ~**rotate_pad_color** (Array[4], default: [0.6, 0.1, 0.9, 0.35]): RGBA color for the rotation pad cylinder. Use a vivid color and moderate alpha for high contrast.
 * ~**base_frame_id** (String, default: "robot_base_footprint"): Base frame of the robot.
 * ~**frame_id** (String, default: "robot_map"): Reference frame for the POIs.
 * ~**goto_planner** (String, default: "mb_avoidance/move_base"): Name of the planner used for navigation.
@@ -109,7 +119,6 @@ A ROS node that provides interactive markers for managing POIs in RViz. It allow
 * ~**delete_all_pois_service_name** (String, default: "poi_manager/delete_environment"): Service name to delete all POIs in an environment.
 * ~**rlc_localization_status_topic_name** (String, default: "robot_local_control/LocalizationComponent/status"): Topic name for localization status.
 * ~**command_manager_goto_command** (String, default: "GOTO"): Command string for GOTO actions.
-
 
 ### 2.2 Subscribed Topics
 
@@ -177,3 +186,15 @@ No
 ### 2.10 Bringup
 
 No
+
+## Design notes
+
+- `pose_dict` is the single source of truth for POIs. `pose_list` is reconstructed from it using `process_pose_dictionary()`.
+- Validation is centralized in `_validate_poi`. Requests pass their POIs to `_save_pois_list`, which validates, updates `pose_dict`, rebuilds `pose_list`, and saves YAML.
+- Concurrency: a `threading.Lock` (`self.poi_lock`) guards read/write operations to avoid races.
+
+## Troubleshooting
+
+- Interaction areas too small: Increase `drag_pad_extra_scale` and/or `rotate_handle_radius`.
+- Pads too visible or distracting: Reduce alpha in `drag_pad_color` / `rotate_pad_color`.
+- RViz ring too small: The global interactive marker `scale` is increased proportionally to `drag_pad_extra_scale`.

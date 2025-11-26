@@ -201,7 +201,7 @@ class PointPath(InteractiveMarker):
         marker_scale_y = rospy.get_param('~marker_scale_y', 0.15)
         marker_scale_z = rospy.get_param('~marker_scale_z', 0.15)
         # New params to enlarge interactive areas (drag + rotate)
-        drag_pad_extra_scale = rospy.get_param('~drag_pad_extra_scale', 1.2)  # factor applied over arrow length for drag pad
+        drag_pad_extra_scale = rospy.get_param('~drag_pad_extra_scale', 1.2)  # scale factor for drag pad size and overall interactive marker size
         rotate_handle_radius = rospy.get_param('~rotate_handle_radius', 1.25)  # radius of rotation helper cylinder
         rotate_handle_thickness = rospy.get_param('~rotate_handle_thickness', 0.01)  # thickness of rotation helper cylinder
         use_rotation_helper = rospy.get_param('~use_rotation_helper', True)
@@ -246,16 +246,7 @@ class PointPath(InteractiveMarker):
             self.marker_move_control.name = "move_plane"
             self.marker_move_control.markers.append( self.marker )
             if use_drag_pad_helper:
-              drag_pad = Marker()
-              drag_pad.type = Marker.CYLINDER
-              drag_pad.pose.position.z = 0.025
-              drag_pad.scale.x = self.marker.scale.x * drag_pad_extra_scale
-              drag_pad.scale.y = self.marker.scale.x * drag_pad_extra_scale
-              drag_pad.scale.z = 0.02
-              drag_pad.color.r = self.marker.color.r
-              drag_pad.color.g = self.marker.color.g
-              drag_pad.color.b = self.marker.color.b
-              drag_pad.color.a = 0.05  # almost transparent but clickable
+              drag_pad = self.drag_pad_helper(drag_pad_extra_scale)
               self.marker_move_control.markers.append(drag_pad)
             self.marker_move_control.interaction_mode = InteractiveMarkerControl.MOVE_PLANE
             self.controls.append( self.marker_move_control )
@@ -270,16 +261,7 @@ class PointPath(InteractiveMarker):
             self.marker_rotate_control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
 
             if use_rotation_helper:
-              rotate_pad = Marker()
-              rotate_pad.type = Marker.CYLINDER
-              rotate_pad.pose.position.z = 0.01
-              rotate_pad.scale.x = rotate_handle_radius * 2.0
-              rotate_pad.scale.y = rotate_handle_radius * 2.0
-              rotate_pad.scale.z = rotate_handle_thickness
-              rotate_pad.color.r = 0.9
-              rotate_pad.color.g = 0.9
-              rotate_pad.color.b = 0.1
-              rotate_pad.color.a = 0.15
+              rotate_pad = self.rotate_pad_helper()
               self.marker_rotate_control.markers.append(rotate_pad)
             self.controls.append( self.marker_rotate_control )
 
@@ -308,16 +290,7 @@ class PointPath(InteractiveMarker):
           self.marker_move_control.name = "move_plane"
           self.marker_move_control.markers.append( self.marker )
           if use_drag_pad_helper:
-            drag_pad = Marker()
-            drag_pad.type = Marker.CYLINDER
-            drag_pad.pose.position.z = 0.025
-            drag_pad.scale.x = self.marker.scale.x * drag_pad_extra_scale
-            drag_pad.scale.y = self.marker.scale.x * drag_pad_extra_scale
-            drag_pad.scale.z = 0.02
-            drag_pad.color.r = self.marker.color.r
-            drag_pad.color.g = self.marker.color.g
-            drag_pad.color.b = self.marker.color.b
-            drag_pad.color.a = 0.05
+            drag_pad = self.drag_pad_helper(drag_pad_extra_scale)
             self.marker_move_control.markers.append(drag_pad)
           self.marker_move_control.interaction_mode = InteractiveMarkerControl.MOVE_PLANE
 
@@ -332,16 +305,7 @@ class PointPath(InteractiveMarker):
           self.marker_rotate_control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
 
           if use_rotation_helper:
-            rotate_pad = Marker()
-            rotate_pad.type = Marker.CYLINDER
-            rotate_pad.pose.position.z = 0.01
-            rotate_pad.scale.x = rotate_handle_radius * 2.0
-            rotate_pad.scale.y = rotate_handle_radius * 2.0
-            rotate_pad.scale.z = rotate_handle_thickness
-            rotate_pad.color.r = 0.9
-            rotate_pad.color.g = 0.9
-            rotate_pad.color.b = 0.1
-            rotate_pad.color.a = 0.15
+            rotate_pad = self.rotate_pad_helper()
             self.marker_rotate_control.markers.append(rotate_pad)
           self.controls.append( self.marker_rotate_control )
 
@@ -384,6 +348,33 @@ class PointPath(InteractiveMarker):
         marker_name.pose.position.z	=0.2
         control.markers.append(marker_name)
         self.controls.append(control)
+
+    def drag_pad_helper (self, extra_scale):
+      drag_pad = Marker()
+      drag_pad.type = Marker.CYLINDER
+      drag_pad.pose.position.z = 0.025
+      drag_pad.scale.x = self.marker.scale.x * extra_scale
+      drag_pad.scale.y = self.marker.scale.x * extra_scale
+      drag_pad.scale.z = 0.02
+      drag_pad.color.r = self.marker.color.r
+      drag_pad.color.g = self.marker.color.g
+      drag_pad.color.b = self.marker.color.b
+      drag_pad.color.a = 0.05
+      return drag_pad
+
+    def rotate_pad_helper (self):
+      rotate_pad = Marker()
+      rotate_pad.type = Marker.CYLINDER
+      rotate_pad.pose.position.z = 0.01
+      rotate_pad.scale.x = self.marker.scale.x * 2.5
+      rotate_pad.scale.y = self.marker.scale.x * 2.5
+      rotate_pad.scale.z = 0.01
+      rotate_pad.color.r = 0.9
+      rotate_pad.color.g = 0.9
+      rotate_pad.color.b = 0.1
+      rotate_pad.color.a = 0.15
+      return rotate_pad
+
 
     ## @brief method called every time that an interaction is received
     def processFeedback(self, feedback):

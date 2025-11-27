@@ -353,8 +353,9 @@ class PoiManager(RComponent):
                 response.success = False
                 response.message = " Poi %s/%s Not found, empty list" % (req.name,req.environment)
                 return response
-            response.success = False
-            response.message = " Poi %s/%s Not found" % (req.name,req.environment)
+        
+        response.success = False
+        response.message = " Poi %s/%s Not found" % (req.name,req.environment)
         return response
 
     def get_environments_cb(self, req):

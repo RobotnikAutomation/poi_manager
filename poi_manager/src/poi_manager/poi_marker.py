@@ -358,33 +358,33 @@ class PointPath(InteractiveMarker):
         self.controls.append(control)
 
     def drag_pad_helper (self, extra_scale):
-      drag_pad = Marker()
-      drag_pad.type = Marker.CYLINDER
-      drag_pad.pose.position.z = 0.025
-      drag_pad.scale.x = self.marker.scale.x * extra_scale
-      drag_pad.scale.y = self.marker.scale.x * extra_scale
-      drag_pad.scale.z = 0.02
-      # Use color configured for drag pad
-      drag_pad.color.r = self.drag_pad_color[0]
-      drag_pad.color.g = self.drag_pad_color[1]
-      drag_pad.color.b = self.drag_pad_color[2]
-      drag_pad.color.a = self.drag_pad_color[3]
-      return drag_pad
+        drag_pad = Marker()
+        drag_pad.type = Marker.CYLINDER
+        drag_pad.pose.position.z = 0.025
+        drag_pad.scale.x = self.marker.scale.x * extra_scale
+        drag_pad.scale.y = self.marker.scale.x * extra_scale
+        drag_pad.scale.z = 0.02
+        # Use color configured for drag pad
+        drag_pad.color.r = self.drag_pad_color[0]
+        drag_pad.color.g = self.drag_pad_color[1]
+        drag_pad.color.b = self.drag_pad_color[2]
+        drag_pad.color.a = self.drag_pad_color[3]
+        return drag_pad
 
     def rotate_pad_helper (self):
-      rotate_pad = Marker()
-      rotate_pad.type = Marker.CYLINDER
-      rotate_pad.pose.position.z = 0.01
-      # Configurable radius and thickness
-      rotate_pad.scale.x = self.rotate_handle_radius * 2.0
-      rotate_pad.scale.y = self.rotate_handle_radius * 2.0
-      rotate_pad.scale.z = self.rotate_handle_thickness
-      # Use color configured for rotate pad
-      rotate_pad.color.r = self.rotate_pad_color[0]
-      rotate_pad.color.g = self.rotate_pad_color[1]
-      rotate_pad.color.b = self.rotate_pad_color[2]
-      rotate_pad.color.a = self.rotate_pad_color[3]
-      return rotate_pad
+        rotate_pad = Marker()
+        rotate_pad.type = Marker.CYLINDER
+        rotate_pad.pose.position.z = 0.01
+        # Configurable radius and thickness
+        rotate_pad.scale.x = self.rotate_handle_radius * 2.0
+        rotate_pad.scale.y = self.rotate_handle_radius * 2.0
+        rotate_pad.scale.z = self.rotate_handle_thickness
+        # Use color configured for rotate pad
+        rotate_pad.color.r = self.rotate_pad_color[0]
+        rotate_pad.color.g = self.rotate_pad_color[1]
+        rotate_pad.color.b = self.rotate_pad_color[2]
+        rotate_pad.color.a = self.rotate_pad_color[3]
+        return rotate_pad
 
 
     ## @brief method called every time that an interaction is received

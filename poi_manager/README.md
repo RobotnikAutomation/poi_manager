@@ -98,7 +98,7 @@ A ROS node that provides interactive markers for managing POIs in RViz. It allow
 * ~**marker_scale_z** (Double, default: 0.15): Arrow head thickness.
 * ~**drag_pad_extra_scale** (Double, default: 1.2): Scale factor applied to a thin cylinder under the arrow used as a large drag area. Also increases the global interactive marker scale so the default RViz rotation ring is easier to grab.
 * ~**use_drag_pad_helper** (Bool, default: true): Enable/disable the larger drag pad helper.
-* ~**drag_pad_color** (Array[4], default: [0.2, 0.2, 0.2, 0.06]): RGBA color for the drag pad cylinder. Low alpha recommended to keep it discreet yet clickable.
+* ~**drag_pad_color** (Array[4], default: [0.2, 0.2, 0.2, 0.30]): RGBA color for the drag pad cylinder. Low alpha recommended to keep it discreet yet clickable.
 * ~**rotate_handle_radius** (Double, default: 1.25): Radius of the rotation helper cylinder used to increase the rotation interaction area.
 * ~**rotate_handle_thickness** (Double, default: 0.01): Thickness (height) of the rotation helper cylinder.
 * ~**use_rotation_helper** (Bool, default: true): Enable/disable the rotation helper pad.

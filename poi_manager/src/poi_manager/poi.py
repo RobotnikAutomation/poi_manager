@@ -301,8 +301,7 @@ class PoiManager(RComponent):
         
         if success:
             rospy.loginfo("%s::add_pois_cb: Successfully saved %d POIs", self._node_name, len(req.pose_list))
-
-
+        return response
     def get_poi_cb(self, req):
         response = GetPOIResponse()
         if( req.environment == ""):

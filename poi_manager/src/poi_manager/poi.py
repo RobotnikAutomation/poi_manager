@@ -306,7 +306,7 @@ class PoiManager(RComponent):
         response = GetPOIResponse()
         if( req.environment == ""):
             response.success = False
-            response.message = "The environment is empty, this enviroment has 0 points"
+            response.message = "The environment is empty, this environment has 0 points"
             return response
         # Use lock to ensure consistent read access to POI data
         with self.poi_lock:

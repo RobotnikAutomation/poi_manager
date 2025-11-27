@@ -89,13 +89,10 @@ A ROS node that provides interactive markers for managing POIs in RViz. It allow
 
 ### 2.1 Parameters
 
-* ~**frame_id** (String, default: "map"): Reference frame for the interactive markers.
+* ~**frame_id** (String, default: "robot_map"): Reference frame for the interactive markers.
 * ~**marker_scale_x** (Double, default: 0.5): X Scale of the interactive markers.
 * ~**marker_scale_y** (Double, default: 0.15): Y Scale of the interactive markers.
 * ~**marker_scale_z** (Double, default: 0.15): Z Scale of the interactive markers.
-* ~**marker_scale_x** (Double, default: 0.5): Arrow length.
-* ~**marker_scale_y** (Double, default: 0.15): Arrow shaft thickness.
-* ~**marker_scale_z** (Double, default: 0.15): Arrow head thickness.
 * ~**drag_pad_extra_scale** (Double, default: 1.2): Scale factor applied to a thin cylinder under the arrow used as a large drag area. Also increases the global interactive marker scale so the default RViz rotation ring is easier to grab.
 * ~**use_drag_pad_helper** (Bool, default: true): Enable/disable the larger drag pad helper.
 * ~**drag_pad_color** (Array[4], default: [0.2, 0.2, 0.2, 0.30]): RGBA color for the drag pad cylinder. Low alpha recommended to keep it discreet yet clickable.
@@ -104,7 +101,6 @@ A ROS node that provides interactive markers for managing POIs in RViz. It allow
 * ~**use_rotation_helper** (Bool, default: true): Enable/disable the rotation helper pad.
 * ~**rotate_pad_color** (Array[4], default: [0.6, 0.1, 0.9, 0.35]): RGBA color for the rotation pad cylinder. Use a vivid color and moderate alpha for high contrast.
 * ~**base_frame_id** (String, default: "robot_base_footprint"): Base frame of the robot.
-* ~**frame_id** (String, default: "robot_map"): Reference frame for the POIs.
 * ~**goto_planner** (String, default: "mb_avoidance/move_base"): Name of the planner used for navigation.
 * ~**use_command_manager_goto** (Bool, default: False): Whether to use the command manager for GOTO actions.
 * ~**use_rms_goto** (Bool, default: False): Whether to use RMS for GOTO actions.

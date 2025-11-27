@@ -269,8 +269,8 @@ class PointPath(InteractiveMarker):
             self.marker_rotate_control.interaction_mode = InteractiveMarkerControl.ROTATE_AXIS
 
             if use_rotation_helper:
-              rotate_pad = self.rotate_pad_helper()
-              self.marker_rotate_control.markers.append(rotate_pad)
+                rotate_pad = self.rotate_pad_helper()
+                self.marker_rotate_control.markers.append(rotate_pad)
             self.controls.append( self.marker_rotate_control )
 
             #control of text marker
